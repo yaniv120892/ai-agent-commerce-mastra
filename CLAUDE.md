@@ -85,6 +85,13 @@ history must wait for `useChat` status `ready`, not merely for cards to appear.
 **`LibSQLStore` requires an `id`.** `new LibSQLStore({ url })` fails to typecheck;
 `LibSQLBaseConfig` requires `id`.
 
+**Delete a route or page? Run `rm -rf .next` before `npm run typecheck`.** `tsconfig.json`
+deliberately includes `.next/types/**/*.ts` for Next's route validation, so a stale build
+cache keeps generating validators that import files you just removed — `tsc` then reports
+`TS2307: Cannot find module '../../src/app/<deleted>/page.js'`. The errors are phantom: they
+live in build output, not source, and vanish on a clean build. This is why the gate can pass
+in a fresh worktree and fail on a long-lived checkout.
+
 **A zod peer warning on `npm install` is expected and benign.** `@mastra/core` vendors a
 nested `@ai-sdk/ui-utils-v5` peer-requiring zod `^3.23.8` against our hoisted zod 4.4.3.
 `src/lib/mastra-zod-interop.test.ts` pins the interop so a real regression surfaces as a
