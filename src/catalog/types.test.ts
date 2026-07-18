@@ -5,7 +5,9 @@ import {
   RETURN_POLICY_VALUES,
   SHIPPING_INFORMATION_VALUES,
   WARRANTY_INFORMATION_VALUES,
+  productCardSchema,
   rawProductSchema,
+  retrievalCriteriaSchema,
 } from './types';
 
 describe('rawProductSchema', () => {
@@ -21,10 +23,68 @@ describe('rawProductSchema', () => {
     expect(rawProductSchema.safeParse(brandless).success).toBe(true);
   });
 
-  it('rejects a category slug outside the 24 real categories', () => {
+  it('accepts a category slug outside the 24 real categories', () => {
     expect(
       rawProductSchema.safeParse({ ...fixtureCatalog[0], category: 'electronics' }).success,
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it('accepts unrecognised logistics values', () => {
+    const drifted = {
+      ...fixtureCatalog[0],
+      shippingInformation: 'Ships via carrier pigeon',
+      returnPolicy: 'Returns accepted in another dimension',
+      warrantyInformation: 'Eternal warranty',
+    };
+    expect(rawProductSchema.safeParse(drifted).success).toBe(true);
+  });
+
+  it('still rejects a structurally wrong product', () => {
+    expect(rawProductSchema.safeParse({ ...fixtureCatalog[0], id: 'not-a-number' }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('productCardSchema', () => {
+  it('accepts a card carrying a category outside the frozen slugs', () => {
+    const card = {
+      id: 9001,
+      title: 'Quantum Flux Capacitor',
+      shortDescription: 'Drifted into a category the model cannot name.',
+      price: 19.99,
+      discountPercentage: 0,
+      effectivePrice: 19.99,
+      rating: 4.2,
+      thumbnail: 'https://cdn.dummyjson.com/thumbnail.png',
+      category: 'electronics',
+      availabilityStatus: 'In Stock',
+      minimumOrderQuantity: 1,
+      minimumSpend: 19.99,
+    };
+
+    expect(productCardSchema.safeParse(card).success).toBe(true);
+  });
+});
+
+describe('retrievalCriteriaSchema', () => {
+  it('still rejects a categorySlug the model invented', () => {
+    const invented = retrievalCriteriaSchema.safeParse({
+      searchTerms: ['laptop'],
+      categorySlug: 'electronics',
+    });
+
+    expect(invented.success).toBe(false);
+  });
+
+  it('accepts every frozen slug', () => {
+    for (const slug of CATEGORY_SLUGS) {
+      const criteria = retrievalCriteriaSchema.safeParse({
+        searchTerms: [],
+        categorySlug: slug,
+      });
+      expect(criteria.success).toBe(true);
+    }
   });
 });
 

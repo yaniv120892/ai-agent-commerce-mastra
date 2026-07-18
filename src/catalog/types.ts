@@ -67,11 +67,15 @@ export const SORT_OPTIONS = [
   'discount-desc',
 ] as const;
 
+// Ingest is deliberately permissive on the vocabulary fields: we do not control the
+// upstream catalog, and rejecting an unrecognised value here fails the whole load rather
+// than the one product. The frozen value lists survive as the *input* vocabulary — what
+// the model may ask for — and as the source for the normalize mapping tables.
 export const rawProductSchema = z.object({
   id: z.number(),
   title: z.string(),
   description: z.string(),
-  category: z.enum(CATEGORY_SLUGS),
+  category: z.string(),
   price: z.number(),
   discountPercentage: z.number(),
   rating: z.number(),
@@ -80,9 +84,9 @@ export const rawProductSchema = z.object({
   brand: z.string().optional(),
   availabilityStatus: z.enum(AVAILABILITY_STATUSES),
   minimumOrderQuantity: z.number(),
-  shippingInformation: z.enum(SHIPPING_INFORMATION_VALUES),
-  returnPolicy: z.enum(RETURN_POLICY_VALUES),
-  warrantyInformation: z.enum(WARRANTY_INFORMATION_VALUES),
+  shippingInformation: z.string(),
+  returnPolicy: z.string(),
+  warrantyInformation: z.string(),
   thumbnail: z.string(),
 });
 
@@ -95,7 +99,7 @@ export const productCardSchema = z.object({
   effectivePrice: z.number(),
   rating: z.number(),
   thumbnail: z.string(),
-  category: z.enum(CATEGORY_SLUGS),
+  category: z.string(),
   availabilityStatus: z.enum(AVAILABILITY_STATUSES),
   minimumOrderQuantity: z.number(),
   minimumSpend: z.number(),
@@ -128,10 +132,20 @@ export type RetrievalCriteria = z.infer<typeof retrievalCriteriaSchema>;
 
 // Deliberately a plain type, not a zod schema: 'Lifetime warranty' normalizes to
 // Infinity, and zod 4's z.number() rejects non-finite values.
+//
+// The three logistics fields are undefined when upstream sends a value outside the known
+// vocabulary. Callers that filter on them must treat undefined as "cannot prove this
+// product qualifies" — see passesHardFilters in resolve-products.ts.
 export type NormalizedProduct = RawProduct & {
-  shippingDays: number;
-  returnDays: number;
-  warrantyMonths: number;
+  shippingDays: number | undefined;
+  returnDays: number | undefined;
+  warrantyMonths: number | undefined;
   effectivePrice: number;
   minimumSpend: number;
+};
+
+export type CatalogDiagnostics = {
+  totalReceived: number;
+  validCount: number;
+  unknownValuesByField: Record<string, string[]>;
 };

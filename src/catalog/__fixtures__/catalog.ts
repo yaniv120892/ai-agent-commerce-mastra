@@ -489,3 +489,28 @@ export const fixtureCatalog: RawProduct[] = [
     thumbnail: 'https://cdn.dummyjson.com/products/images/vehicle/Dodge%20Hornet/thumbnail.png',
   },
 ];
+
+// Kept out of fixtureCatalog on purpose: several suites assert exact enum coverage and
+// "every fixture product is known-good" over that array, and it is shared by the tool,
+// memory, integration, and eval suites. Drift scenarios belong in their own corpus.
+export const productWithUnknownCategory: RawProduct = {
+  ...fixtureCatalog[0],
+  id: 9001,
+  title: 'Quantum Flux Capacitor',
+  category: 'electronics',
+};
+
+export const productWithUnknownLogistics: RawProduct = {
+  ...fixtureCatalog[0],
+  id: 9002,
+  title: 'Teleporting Sock Drawer',
+  shippingInformation: 'Ships via carrier pigeon',
+  returnPolicy: 'Returns accepted in another dimension',
+  warrantyInformation: 'Eternal warranty',
+};
+
+export const fixtureCatalogWithUnknownValues: RawProduct[] = [
+  ...fixtureCatalog,
+  productWithUnknownCategory,
+  productWithUnknownLogistics,
+];
