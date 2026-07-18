@@ -1,65 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { fixtureCatalog } from './__fixtures__/catalog';
+import {
+  fixtureCatalog,
+  productWithUnknownCategory,
+  productWithUnknownLogistics,
+} from './__fixtures__/catalog';
+import { normalizeProduct } from './normalize';
 import { resolveProducts } from './resolve-products';
-import type {
-  NormalizedProduct,
-  RawProduct,
-  RetrievalCriteria,
-  ReturnPolicy,
-  ShippingInformation,
-  WarrantyInformation,
-} from './types';
-
-const SHIPPING_DAYS: Record<ShippingInformation, number> = {
-  'Ships overnight': 1,
-  'Ships in 1-2 business days': 2,
-  'Ships in 3-5 business days': 5,
-  'Ships in 1 week': 7,
-  'Ships in 2 weeks': 14,
-  'Ships in 1 month': 30,
-};
-
-const RETURN_DAYS: Record<ReturnPolicy, number> = {
-  'No return policy': 0,
-  '7 days return policy': 7,
-  '30 days return policy': 30,
-  '60 days return policy': 60,
-  '90 days return policy': 90,
-};
-
-const WARRANTY_MONTHS: Record<WarrantyInformation, number> = {
-  'No warranty': 0,
-  '1 week warranty': 0.25,
-  '1 month warranty': 1,
-  '3 months warranty': 3,
-  '6 months warranty': 6,
-  '1 year warranty': 12,
-  '2 year warranty': 24,
-  '3 year warranty': 36,
-  '5 year warranty': 60,
-  'Lifetime warranty': Infinity,
-};
+import type { RetrievalCriteria } from './types';
 
 const APPLE_ELECTRONICS_TERMS = ['apple', 'laptop', 'tablet', 'smartphone'];
 
-const catalog = fixtureCatalog.map((product) => toNormalizedProduct(product));
-
-function toNormalizedProduct(product: RawProduct): NormalizedProduct {
-  const effectivePrice = roundToCents(product.price * (1 - product.discountPercentage / 100));
-
-  return {
-    ...product,
-    shippingDays: SHIPPING_DAYS[product.shippingInformation],
-    returnDays: RETURN_DAYS[product.returnPolicy],
-    warrantyMonths: WARRANTY_MONTHS[product.warrantyInformation],
-    effectivePrice,
-    minimumSpend: roundToCents(product.price * product.minimumOrderQuantity),
-  };
-}
-
-function roundToCents(value: number): number {
-  return Math.round(value * 100) / 100;
-}
+const catalog = fixtureCatalog.map((product) => normalizeProduct(product));
 
 function idsOf(cards: { id: number }[]): number[] {
   return cards.map((card) => card.id);
@@ -156,6 +107,42 @@ describe('resolveProducts hard filters', () => {
       const product = catalog.find((entry) => entry.id === card.id);
       expect(product?.returnDays).toBeGreaterThanOrEqual(60);
     }
+  });
+});
+
+describe('resolveProducts with unnormalized logistics values', () => {
+  const driftedCatalog = [...catalog, normalizeProduct(productWithUnknownLogistics)];
+
+  it('returns a product with unknown shipping when no shipping filter is active', () => {
+    const cards = resolveProducts({ searchTerms: ['teleporting'] }, driftedCatalog);
+
+    expect(cards.map((card) => card.id)).toContain(productWithUnknownLogistics.id);
+  });
+
+  it('excludes a product with unknown shipping once maxShippingDays is set', () => {
+    const cards = resolveProducts(
+      { searchTerms: ['teleporting'], maxShippingDays: 30 },
+      driftedCatalog,
+    );
+
+    expect(cards.map((card) => card.id)).not.toContain(productWithUnknownLogistics.id);
+  });
+
+  it('excludes a product with unknown return policy once minReturnDays is set', () => {
+    const cards = resolveProducts(
+      { searchTerms: ['teleporting'], minReturnDays: 0 },
+      driftedCatalog,
+    );
+
+    expect(cards.map((card) => card.id)).not.toContain(productWithUnknownLogistics.id);
+  });
+
+  it('keeps a product whose category drifted outside the frozen slugs searchable by text', () => {
+    const withUnknownCategory = [...catalog, normalizeProduct(productWithUnknownCategory)];
+
+    const cards = resolveProducts({ searchTerms: ['quantum'] }, withUnknownCategory);
+
+    expect(cards.map((card) => card.id)).toContain(productWithUnknownCategory.id);
   });
 });
 

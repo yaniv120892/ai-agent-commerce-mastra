@@ -55,14 +55,43 @@ function passesHardFilters(product: NormalizedProduct, criteria: RetrievalCriter
   if (criteria.inStock === true && product.availabilityStatus === 'Out of Stock') {
     return false;
   }
-  if (criteria.maxShippingDays !== undefined && product.shippingDays > criteria.maxShippingDays) {
+  if (!satisfiesMaxShippingDays(product.shippingDays, criteria.maxShippingDays)) {
     return false;
   }
-  if (criteria.minReturnDays !== undefined && product.returnDays < criteria.minReturnDays) {
+  if (!satisfiesMinReturnDays(product.returnDays, criteria.minReturnDays)) {
     return false;
   }
 
   return true;
+}
+
+// An unnormalized logistics value cannot be shown to satisfy the filter, so it is excluded
+// while the filter is active. Without the explicit undefined check the comparison would be
+// `undefined > n` — false — and the product would silently pass a bound it never met.
+function satisfiesMaxShippingDays(
+  shippingDays: number | undefined,
+  maxShippingDays: number | undefined,
+): boolean {
+  if (maxShippingDays === undefined) {
+    return true;
+  }
+  if (shippingDays === undefined) {
+    return false;
+  }
+  return shippingDays <= maxShippingDays;
+}
+
+function satisfiesMinReturnDays(
+  returnDays: number | undefined,
+  minReturnDays: number | undefined,
+): boolean {
+  if (minReturnDays === undefined) {
+    return true;
+  }
+  if (returnDays === undefined) {
+    return false;
+  }
+  return returnDays >= minReturnDays;
 }
 
 function scoreProducts(products: NormalizedProduct[], searchTerms: string[]): ScoredProduct[] {
