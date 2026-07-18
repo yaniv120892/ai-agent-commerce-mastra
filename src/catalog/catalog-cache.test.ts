@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fixtureCatalog } from './__fixtures__/catalog';
+import { fixtureCatalog, fixtureCatalogWithUnknownValues } from './__fixtures__/catalog';
 import {
   CATALOG_CACHE_TTL_MS,
+  CATALOG_STALE_RETRY_MS,
   getCatalog,
+  getCatalogDiagnostics,
   getNormalizedCatalog,
   resetCatalogCache,
 } from './catalog-cache';
@@ -110,6 +112,84 @@ describe('getCatalog', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(products).toHaveLength(fixtureCatalog.length);
+  });
+});
+
+describe('getCatalog when a refresh fails on a warm cache', () => {
+  it('serves the last known good catalog instead of failing the request', async () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockImplementation(async () => jsonResponse());
+
+    const warm = await getCatalog();
+    vi.advanceTimersByTime(CATALOG_CACHE_TTL_MS + 1);
+
+    fetchMock.mockReset();
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+    const stale = await getCatalog();
+
+    expect(stale).toBe(warm);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('last known good'));
+    warnSpy.mockRestore();
+  });
+
+  it('recovers to fresh data once upstream returns', async () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockImplementation(async () => jsonResponse());
+
+    const warm = await getCatalog();
+    vi.advanceTimersByTime(CATALOG_CACHE_TTL_MS + 1);
+
+    fetchMock.mockReset();
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+    await getCatalog();
+
+    vi.advanceTimersByTime(CATALOG_STALE_RETRY_MS + 1);
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async () => jsonResponse());
+    const recovered = await getCatalog();
+
+    expect(recovered).not.toBe(warm);
+    expect(recovered).toHaveLength(fixtureCatalog.length);
+    warnSpy.mockRestore();
+  });
+
+  it('still throws when the very first load fails and there is nothing to fall back to', async () => {
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+
+    await expect(getCatalog()).rejects.toThrow('fetch failed');
+  });
+});
+
+describe('getCatalogDiagnostics', () => {
+  it('reports a clean load with no unknown values', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse());
+
+    const diagnostics = await getCatalogDiagnostics();
+
+    expect(diagnostics.totalReceived).toBe(fixtureCatalog.length);
+    expect(diagnostics.validCount).toBe(fixtureCatalog.length);
+    expect(diagnostics.unknownValuesByField).toEqual({});
+  });
+
+  it('names the unknown values and warns once when the catalog drifts', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ products: fixtureCatalogWithUnknownValues }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+
+    const diagnostics = await getCatalogDiagnostics();
+
+    expect(diagnostics.validCount).toBe(fixtureCatalogWithUnknownValues.length);
+    expect(diagnostics.unknownValuesByField.category).toEqual(['electronics']);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain('unknown category values: electronics');
+    warnSpy.mockRestore();
   });
 });
 

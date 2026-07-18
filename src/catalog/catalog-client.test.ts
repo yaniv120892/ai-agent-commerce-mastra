@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fixtureCatalog } from './__fixtures__/catalog';
+import { fixtureCatalog, fixtureCatalogWithUnknownValues } from './__fixtures__/catalog';
 import {
   CATALOG_URL,
   CatalogPayloadError,
@@ -46,15 +46,49 @@ describe('fetchRawProducts', () => {
   it('returns every validated product from the payload', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ products: fixtureCatalog }));
 
-    const products = await fetchRawProducts();
+    const { products, totalReceived, rejections } = await fetchRawProducts();
 
     expect(products).toHaveLength(fixtureCatalog.length);
     expect(products[0]).toEqual(fixtureCatalog[0]);
+    expect(totalReceived).toBe(fixtureCatalog.length);
+    expect(rejections).toEqual([]);
   });
 
-  it('rejects a payload whose category is outside the frozen enum, naming the offending value', async () => {
-    const malformed = [{ ...fixtureCatalog[0], category: 'electronics' }];
-    fetchMock.mockResolvedValue(jsonResponse({ products: malformed }));
+  it('accepts a category outside the frozen slugs rather than failing the whole load', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ products: fixtureCatalogWithUnknownValues }));
+
+    const { products, rejections } = await fetchRawProducts();
+
+    expect(products).toHaveLength(fixtureCatalogWithUnknownValues.length);
+    expect(rejections).toEqual([]);
+    expect(products.map((product) => product.category)).toContain('electronics');
+  });
+
+  it('accepts an unrecognised logistics value rather than failing the whole load', async () => {
+    const drifted = [{ ...fixtureCatalog[0], shippingInformation: 'Ships in 4 business days' }];
+    fetchMock.mockResolvedValue(jsonResponse({ products: drifted }));
+
+    const { products } = await fetchRawProducts();
+
+    expect(products).toHaveLength(1);
+    expect(products[0].shippingInformation).toBe('Ships in 4 business days');
+  });
+
+  it('keeps the valid products when a structurally broken one is mixed in', async () => {
+    const mixed = [...fixtureCatalog, { id: 'not-a-number', title: 'Broken' }];
+    fetchMock.mockResolvedValue(jsonResponse({ products: mixed }));
+
+    const { products, totalReceived, rejections } = await fetchRawProducts();
+
+    expect(products).toHaveLength(fixtureCatalog.length);
+    expect(totalReceived).toBe(fixtureCatalog.length + 1);
+    expect(rejections).toHaveLength(1);
+    expect(rejections[0]).toContain(`index ${fixtureCatalog.length}`);
+  });
+
+  it('rejects a payload where most products fail, treating it as a changed API shape', async () => {
+    const mostlyBroken = [fixtureCatalog[0], { id: 'x' }, { id: 'y' }, { id: 'z' }];
+    fetchMock.mockResolvedValue(jsonResponse({ products: mostlyBroken }));
 
     const failure = await fetchRawProducts().catch((error: unknown) => error);
 
@@ -62,16 +96,22 @@ describe('fetchRawProducts', () => {
     if (!(failure instanceof CatalogPayloadError)) {
       throw new Error('expected a CatalogPayloadError');
     }
-    expect(failure.message).toContain('index 0');
-    expect(failure.message).toContain('category');
-    expect(failure.receivedPayload).toContain('electronics');
+    expect(failure.message).toContain('only 1 valid products out of 4');
   });
 
-  it('rejects a payload whose shipping information is an unrecognised logistics value', async () => {
-    const malformed = [{ ...fixtureCatalog[0], shippingInformation: 'Ships in 4 business days' }];
-    fetchMock.mockResolvedValue(jsonResponse({ products: malformed }));
+  it('rejects a payload whose products are all unparseable', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ products: [{ id: 'nope' }] }));
 
     await expect(fetchRawProducts()).rejects.toBeInstanceOf(CatalogPayloadError);
+  });
+
+  it('accepts an empty catalog without tripping the valid-fraction floor', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ products: [] }));
+
+    const { products, totalReceived } = await fetchRawProducts();
+
+    expect(products).toEqual([]);
+    expect(totalReceived).toBe(0);
   });
 
   it('rejects a payload that is not a products envelope', async () => {
@@ -98,7 +138,7 @@ describe('fetchRawProducts', () => {
       .mockResolvedValueOnce(errorResponse(503, 'Service Unavailable'))
       .mockResolvedValueOnce(jsonResponse({ products: fixtureCatalog }));
 
-    const products = await fetchRawProducts();
+    const { products } = await fetchRawProducts();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(products).toHaveLength(fixtureCatalog.length);
@@ -137,7 +177,7 @@ describe('fetchRawProducts', () => {
       .mockRejectedValueOnce(new TypeError('fetch failed'))
       .mockResolvedValueOnce(jsonResponse({ products: fixtureCatalog }));
 
-    const products = await fetchRawProducts();
+    const { products } = await fetchRawProducts();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(products).toHaveLength(fixtureCatalog.length);

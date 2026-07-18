@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { fixtureCatalog } from './__fixtures__/catalog';
-import { UnknownCatalogEnumValueError, normalizeProduct } from './normalize';
+import {
+  fixtureCatalog,
+  fixtureCatalogWithUnknownValues,
+  productWithUnknownCategory,
+  productWithUnknownLogistics,
+} from './__fixtures__/catalog';
+import { collectUnknownValues, normalizeProduct } from './normalize';
 import type { RawProduct, ReturnPolicy, ShippingInformation, WarrantyInformation } from './types';
 import {
   RETURN_POLICY_VALUES,
@@ -40,13 +45,6 @@ const EXPECTED_WARRANTY_MONTHS: Record<WarrantyInformation, number> = {
 
 function productWith(overrides: Partial<RawProduct>): RawProduct {
   return { ...fixtureCatalog[0], ...overrides };
-}
-
-function corruptedProduct(field: keyof RawProduct, value: string): RawProduct {
-  const corrupted: RawProduct = JSON.parse(
-    JSON.stringify({ ...fixtureCatalog[0], [field]: value }),
-  );
-  return corrupted;
 }
 
 describe('normalizeProduct enum mappings', () => {
@@ -159,28 +157,52 @@ describe('normalizeProduct resilience', () => {
   });
 
   it.each([
-    ['shippingInformation', 'Ships in 3 fortnights'],
-    ['returnPolicy', '45 days return policy'],
-    ['warrantyInformation', 'Eternal warranty'],
-  ] as const)('throws a typed error naming the offending %s value', (field, value) => {
-    const corrupted = corruptedProduct(field, value);
-    expect(() => normalizeProduct(corrupted)).toThrow(UnknownCatalogEnumValueError);
-    expect(() => normalizeProduct(corrupted)).toThrow(value);
+    ['shippingInformation', 'Ships in 3 fortnights', 'shippingDays'],
+    ['returnPolicy', '45 days return policy', 'returnDays'],
+    ['warrantyInformation', 'Eternal warranty', 'warrantyMonths'],
+  ] as const)(
+    'maps an unrecognised %s to undefined instead of throwing',
+    (field, value, mapped) => {
+      const normalized = normalizeProduct(productWith({ [field]: value }));
+      expect(normalized[mapped]).toBeUndefined();
+    },
+  );
+
+  it('keeps the rest of the product intact when one logistics value is unrecognised', () => {
+    const normalized = normalizeProduct(productWithUnknownLogistics);
+
+    expect(normalized.shippingDays).toBeUndefined();
+    expect(normalized.returnDays).toBeUndefined();
+    expect(normalized.warrantyMonths).toBeUndefined();
+    expect(normalized.title).toBe(productWithUnknownLogistics.title);
+    expect(normalized.effectivePrice).toBeGreaterThan(0);
+    expect(normalized.minimumSpend).toBeGreaterThan(0);
   });
 
-  it('reports the field, value, and product id on the thrown error', () => {
-    try {
-      normalizeProduct(corruptedProduct('warrantyInformation', 'Eternal warranty'));
-      expect.unreachable('normalizeProduct should have thrown');
-    } catch (error) {
-      expect(error).toBeInstanceOf(UnknownCatalogEnumValueError);
-      if (!(error instanceof UnknownCatalogEnumValueError)) {
-        return;
-      }
-      expect(error.fieldName).toBe('warrantyInformation');
-      expect(error.value).toBe('Eternal warranty');
-      expect(error.productId).toBe(fixtureCatalog[0].id);
-      expect(error.message).toContain('Lifetime warranty');
-    }
+  it('normalizes a product carrying a category outside the frozen slugs', () => {
+    const normalized = normalizeProduct(productWithUnknownCategory);
+
+    expect(normalized.category).toBe('electronics');
+    expect(typeof normalized.shippingDays).toBe('number');
+  });
+});
+
+describe('collectUnknownValues', () => {
+  it('reports nothing for a catalog that uses only known values', () => {
+    expect(collectUnknownValues(fixtureCatalog)).toEqual({});
+  });
+
+  it('reports the distinct unknown values per field', () => {
+    expect(collectUnknownValues(fixtureCatalogWithUnknownValues)).toEqual({
+      category: ['electronics'],
+      shippingInformation: ['Ships via carrier pigeon'],
+      returnPolicy: ['Returns accepted in another dimension'],
+      warrantyInformation: ['Eternal warranty'],
+    });
+  });
+
+  it('deduplicates a value repeated across products', () => {
+    const repeated = [productWithUnknownCategory, { ...productWithUnknownCategory, id: 9003 }];
+    expect(collectUnknownValues(repeated).category).toEqual(['electronics']);
   });
 });
