@@ -34,6 +34,12 @@ Referenced directly by later tickets.
 All enum values above carry the literal `warranty` / `return policy` suffix as returned by the
 API (e.g. `'No warranty'`, `'Lifetime warranty'`, `'7 days return policy'`).
 
-**Rounding rule:** `effectivePrice` and `minimumSpend` are rounded to 2 decimal places.
-IEEE-754 makes `9.99 * 48` evaluate to `479.52000000000004` in JS; the stored and displayed
-value is `479.52`.
+**Rounding rule:** `effectivePrice` and `minimumSpend` are rounded to 2 decimal places via
+`Math.round(value * 100) / 100`.
+
+Verified drift examples — do not substitute the mascara here. `9.99 * 48` lands exactly on
+`479.52` in V8 and needs no rounding, so it does **not** demonstrate the rule (an earlier
+revision of this doc claimed otherwise and was wrong; a test written against it fails).
+Genuine drift: `5.49 * 20` → `109.80000000000001`, and roughly half the catalog drifts on
+`effectivePrice`, e.g. `9.99 @ 10.48%` → `8.943048000000001` and
+`549.99 @ 11.05%` → `489.21610499999997`.
