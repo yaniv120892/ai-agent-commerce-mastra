@@ -6,6 +6,9 @@ const eslintConfig = [
   {
     ignores: [
       '.next/**',
+      // `mastra dev` writes a 20MB bundle here, including the Studio frontend assets.
+      // Linting it exhausts the V8 heap and crashes the gate outright.
+      '.mastra/**',
       'node_modules/**',
       'coverage/**',
       'playwright-report/**',
