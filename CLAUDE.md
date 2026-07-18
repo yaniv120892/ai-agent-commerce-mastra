@@ -2,8 +2,8 @@
 
 # AI Commerce Copilot — Architecture Contract
 
-This file is the contract every ticket in this project must follow. Wave 0 (YAN-29)
-established it; later tickets extend the code but do not renegotiate these rules.
+This file is the contract every change in this project must follow. The initial scaffold
+established it; later work extends the code but does not renegotiate these rules.
 
 ## Architecture rules
 
@@ -68,7 +68,7 @@ directly (in tests), never an `as` cast.
 **`handleChatStream` must be called with `version: 'v6'`.** The default (`v5`) does not
 typecheck against `ai@7` — the vendored v5 types still carry `finishReason: 'unknown'`,
 which `ai@7` dropped from its `FinishReason` union. The wire format is identical either
-way (verified in YAN-30), so this is a compile-time requirement, not a runtime one.
+way (verified against the live API), so this is a compile-time requirement, not a runtime one.
 Match it on the read side with `toAISdkMessages(messages, { version: 'v6' })` from
 `@mastra/ai-sdk/ui`. `toAISdkFormat` is deprecated and throws.
 
@@ -157,4 +157,4 @@ Project-wide, enforced in review:
   domain context.
 - Errors carry the offending values: include what was actually received, not just what was
   expected.
-- Conventional Commits, scoped to the ticket: `feat(YAN-31): ...`, `fix(YAN-30): ...`.
+- Conventional Commits, scoped to the module touched: `feat(catalog): ...`, `fix(chat): ...`.

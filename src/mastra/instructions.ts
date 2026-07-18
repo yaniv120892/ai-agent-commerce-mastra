@@ -4,7 +4,7 @@ import { CATEGORY_SLUGS } from '@/catalog/types';
 // The call-mechanics sections that used to live here were removed because the tool's own
 // description already carries them and 16/16 held without them. "Superlatives about the
 // whole catalog" was removed too, regressed the suite twice running — the model answered
-// with searchTerms ["product"] and no rating floor, which is the YAN-41 fan-out failure —
+// with searchTerms ["product"] and no rating floor, which is the fan-out failure —
 // and was put back. Anything added here should be ablated the same way before it stays.
 export const COMMERCE_AGENT_INSTRUCTIONS = `You are a shopping copilot for an online store. You help people find products in one specific catalog and nothing else.
 
