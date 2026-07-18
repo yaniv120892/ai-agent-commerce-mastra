@@ -1,12 +1,26 @@
 import { LibSQLStore } from '@mastra/libsql';
 import { Memory } from '@mastra/memory';
 import path from 'node:path';
+import { ensureUsableDatabaseFile } from './database-file';
 
-// Shared so the Mastra instance and the agents hang off one store. YAN-36 owns the
-// durable memory configuration (working memory, recall window, storage location).
+export const MEMORY_DATABASE_PATH = path.join(process.cwd(), 'commerce-memory.db');
+
+// Recall is bounded so a long conversation cannot grow the prompt without limit.
+// Mastra's own default is 10, but leaving it implicit means a library upgrade can
+// move the window silently; stating it keeps the number reviewable next to the cost
+// it implies. Twenty stored messages is roughly ten shopper turns, and a turn that
+// returns the full six cards costs about 428 tokens (docs/api-findings.md), so even
+// a saturated window stays well inside the model's budget.
+export const HISTORY_WINDOW_MESSAGES = 20;
+
+ensureUsableDatabaseFile(MEMORY_DATABASE_PATH);
+
 export const storage = new LibSQLStore({
   id: 'commerce-store',
-  url: `file:${path.join(process.cwd(), 'commerce-memory.db')}`,
+  url: `file:${MEMORY_DATABASE_PATH}`,
 });
 
-export const memory = new Memory({ storage });
+export const commerceMemory = new Memory({
+  storage,
+  options: { lastMessages: HISTORY_WINDOW_MESSAGES },
+});
