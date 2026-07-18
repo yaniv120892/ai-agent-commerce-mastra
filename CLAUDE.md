@@ -65,6 +65,26 @@ form that appears in most training data and older Mastra docs. The `context` arg
 requires an `observe` property; use the exported `noopObserve` when calling a tool
 directly (in tests), never an `as` cast.
 
+**`handleChatStream` must be called with `version: 'v6'`.** The default (`v5`) does not
+typecheck against `ai@7` — the vendored v5 types still carry `finishReason: 'unknown'`,
+which `ai@7` dropped from its `FinishReason` union. The wire format is identical either
+way (verified in YAN-30), so this is a compile-time requirement, not a runtime one.
+Match it on the read side with `toAISdkMessages(messages, { version: 'v6' })` from
+`@mastra/ai-sdk/ui`. `toAISdkFormat` is deprecated and throws.
+
+**`memory.recall()` throws on a thread that does not exist yet** —
+`Error: No thread found with id <threadId>`, rather than returning an empty result. Any
+history route must guard with `memory.getThreadById({ threadId, resourceId })` and return
+an empty message list when it is null, or a first visit 500s.
+
+**Mastra persists an assistant message only when the stream completes.** Tool results
+render in the UI at `tool-output-available`, which is well before the turn is durable; a
+reload between those two points loses the whole turn. Tests and UI flows that depend on
+history must wait for `useChat` status `ready`, not merely for cards to appear.
+
+**`LibSQLStore` requires an `id`.** `new LibSQLStore({ url })` fails to typecheck;
+`LibSQLBaseConfig` requires `id`.
+
 **A zod peer warning on `npm install` is expected and benign.** `@mastra/core` vendors a
 nested `@ai-sdk/ui-utils-v5` peer-requiring zod `^3.23.8` against our hoisted zod 4.4.3.
 `src/lib/mastra-zod-interop.test.ts` pins the interop so a real regression surfaces as a
