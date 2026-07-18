@@ -238,6 +238,14 @@ function collectCriteriaMismatches(
     );
   }
   if (
+    expectation.searchTermsEmpty !== undefined &&
+    (criteria.searchTerms.length === 0) !== expectation.searchTermsEmpty
+  ) {
+    mismatches.push(
+      `searchTerms ${JSON.stringify(criteria.searchTerms)} is ${criteria.searchTerms.length === 0 ? '' : 'not '}empty, expected ${expectation.searchTermsEmpty ? '' : 'not '}empty`,
+    );
+  }
+  if (
     expectation.excludeBrandsMatchAnyOf !== undefined &&
     !matchesAnyTerm(criteria.excludeBrands ?? [], expectation.excludeBrandsMatchAnyOf)
   ) {
