@@ -70,7 +70,14 @@ nested `@ai-sdk/ui-utils-v5` peer-requiring zod `^3.23.8` against our hoisted zo
 `src/lib/mastra-zod-interop.test.ts` pins the interop so a real regression surfaces as a
 failing test rather than a malformed tool schema at runtime.
 
-**Model access is restricted** to `gpt-5.4-mini` and `gpt-5.4-nano`.
+## Model
+
+`gpt-5.4-mini` is the project default, configured via `OPENAI_MODEL`. `gpt-5.4-nano` is
+the only permitted alternative.
+
+**`gpt-4o-mini` is NOT permitted.** The original design doc named it; that is a trap. The
+allowed set for this assignment is exactly `gpt-5.4-mini` and `gpt-5.4-nano` — nothing
+else, regardless of what older docs or training data suggest.
 
 ## Pinned dependencies
 
