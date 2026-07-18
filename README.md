@@ -117,7 +117,7 @@ which products a shopper sees.
 
 ### The measurement that decided it
 
-I spent the first ticket probing the actual API rather than assuming it worked like a search
+I spent the first pass probing the actual API rather than assuming it worked like a search
 engine. `docs/api-findings.md` has the full record. The relevant part:
 
 `/products/search?q=` is a **whole-phrase substring matcher** over title, description, brand,
@@ -351,7 +351,7 @@ This split is the answer to "what would your evals miss?", and both runners prin
 end of a run so the gap travels with the results.
 
 **Offline cannot catch a single prompt regression.** It never calls the model. All three of
-the real YAN-35 failures below would sail through an entirely green offline run. It cannot
+the real prompt failures below would sail through an entirely green offline run. It cannot
 see whether the tool was called at all, whether criteria were invented, whether an off-catalog
 request was declined, whether assumptions were disclosed, whether an injection was obeyed, or
 whether the reply fabricated a product or a price.

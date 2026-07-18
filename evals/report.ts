@@ -13,8 +13,8 @@ const OFFLINE_CATCHES = [
 ];
 
 const OFFLINE_MISSES = [
-  'whether the model calls the tool at all (the YAN-35 multi-intent zero-call failure)',
-  'whether it invents criteria nobody asked for (the YAN-35 unrequested minRating 4.5)',
+  'whether the model calls the tool at all (the multi-intent zero-call failure)',
+  'whether it invents criteria nobody asked for (the unrequested minRating 4.5)',
   'whether it declines out-of-catalog requests instead of searching anyway',
   'whether it discloses the assumptions it made on a vague request',
   'whether it obeys an injected instruction in a user message or a product description',

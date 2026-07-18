@@ -94,8 +94,8 @@
     {
       "id": "superlative-highest-rated-catalog",
       "query": "what are your highest rated products?",
-      "proves": "REGRESSION (YAN-41): a whole-catalog superlative is answered by one wide call — empty searchTerms, no categorySlug, rating-desc plus the calibrated 4.5 floor — rather than fanning out into one narrow call per guessed category. The observed failure produced seven calls, each carrying the placeholder term [\"product\"].",
-      "regressionOf": "YAN-41: superlative queries fanned out across guessed categories",
+      "proves": "REGRESSION: a whole-catalog superlative is answered by one wide call — empty searchTerms, no categorySlug, rating-desc plus the calibrated 4.5 floor — rather than fanning out into one narrow call per guessed category. The observed failure produced seven calls, each carrying the placeholder term [\"product\"].",
+      "regressionOf": "superlative queries fanned out across guessed categories",
       "expect": {
         "toolCalled": true,
         "toolCallCount": 1,
@@ -133,8 +133,8 @@
     {
       "id": "unrequested-rating-floor-regression",
       "query": "I need a laptop for work",
-      "proves": "REGRESSION (YAN-35): an ordinary request must not acquire minRating on the model's own initiative. The observed failure collapsed 5 laptops to 1.",
-      "regressionOf": "YAN-35: unrequested minRating 4.5 on a plain \"laptop for work\" query",
+      "proves": "REGRESSION: an ordinary request must not acquire minRating on the model's own initiative. The observed failure collapsed 5 laptops to 1.",
+      "regressionOf": "unrequested minRating 4.5 on a plain \"laptop for work\" query",
       "expect": {
         "toolCalled": true,
         "criteria": {
@@ -167,8 +167,8 @@
     {
       "id": "ambiguous-cheap-and-cool",
       "query": "show me something cheap and cool",
-      "proves": "REGRESSION (YAN-35): a vague request picks defaults, searches wide, and states the assumptions out loud instead of silently guessing a budget and a category and a rating floor at once.",
-      "regressionOf": "YAN-35: vague requests under-disclosed their assumptions",
+      "proves": "REGRESSION: a vague request picks defaults, searches wide, and states the assumptions out loud instead of silently guessing a budget and a category and a rating floor at once.",
+      "regressionOf": "vague requests under-disclosed their assumptions",
       "expect": {
         "toolCalled": true,
         "criteria": { "forbiddenFields": ["minRating", "categorySlug"] },
@@ -214,8 +214,8 @@
     {
       "id": "multi-intent-phone-and-laptop",
       "query": "I need a phone and a laptop",
-      "proves": "REGRESSION (YAN-35): two intents mean two real tool calls in one turn. The observed failure made ZERO calls while claiming \"I already pulled phone and laptop options\" — a fabricated retrieval claim, exactly the hallucination this architecture exists to prevent.",
-      "regressionOf": "YAN-35: multi-intent turn made zero tool calls and claimed it had already pulled results",
+      "proves": "REGRESSION: two intents mean two real tool calls in one turn. The observed failure made ZERO calls while claiming \"I already pulled phone and laptop options\" — a fabricated retrieval claim, exactly the hallucination this architecture exists to prevent.",
+      "regressionOf": "multi-intent turn made zero tool calls and claimed it had already pulled results",
       "expect": {
         "toolCalled": true,
         "toolCallCount": 2,

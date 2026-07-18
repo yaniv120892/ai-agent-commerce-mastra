@@ -1,8 +1,8 @@
-# YAN-30 — Integration Spike Findings
+# Integration Spike Findings
 
 Verdict: **all four unknowns clear. The stack as pinned in `CLAUDE.md` works end to end.**
 No dependency fallback was needed. Two non-obvious runtime behaviours were found and are
-now encoded in the scaffold; both are listed under "What downstream tickets must know".
+now encoded in the scaffold; both are listed under "What downstream work must know".
 
 Measured on 2026-07-18 against `gpt-5.4-mini` via the real OpenAI API. The throwaway
 scaffold is one agent (`src/mastra/index.ts`), one trivial tool
@@ -95,16 +95,16 @@ untouched.
 
 ---
 
-## What downstream tickets must know
+## What downstream work must know
 
 Two behaviours cost debugging time here. Both are now handled in the scaffold, and both are
-recorded in `CLAUDE.md` so later tickets do not rediscover them.
+recorded in `CLAUDE.md` so later work does not rediscover them.
 
 **`memory.recall()` throws on a thread that does not exist yet.** It raises
 `Error: No thread found with id <threadId>` rather than returning an empty result, so a
 first-visit history fetch 500s. Guard with `memory.getThreadById({ threadId, resourceId })`
-and return an empty message list when it is null. The spike routes were retired in
-YAN-36; the guard now lives in `GET` on `src/app/api/chat/route.ts`.
+and return an empty message list when it is null. The spike routes have since been retired;
+the guard now lives in `GET` on `src/app/api/chat/route.ts`.
 
 **Mastra persists the assistant message only when the stream completes.** Cards appear in
 the UI at `tool-output-available`, which is well before the turn is durable. A reload
