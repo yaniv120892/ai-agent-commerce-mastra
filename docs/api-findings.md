@@ -19,7 +19,7 @@ API behaviour that contradicts them.
 
 ## Supporting details
 
-Referenced directly by later tickets.
+Referenced directly by the rest of the project.
 
 **The 24 category slugs:** `beauty, fragrances, furniture, groceries, home-decoration, kitchen-accessories, laptops, mens-shirts, mens-shoes, mens-watches, mobile-accessories, motorcycle, skin-care, smartphones, sports-accessories, sunglasses, tablets, tops, vehicle, womens-bags, womens-dresses, womens-jewellery, womens-shoes, womens-watches`
 
