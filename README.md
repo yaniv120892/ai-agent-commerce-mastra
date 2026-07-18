@@ -474,6 +474,14 @@ disproven capability is worth re-testing before you architect around its absence
   and a per-product quarantine would be the better long-run answer.
 - **`gpt-5.4-nano` is untested end-to-end.** It is permitted by the env schema; the evals were
   run against `gpt-5.4-mini`.
+- **The chat route trusts the client body.** `POST /api/chat` spreads the request body into
+  `handleChatStream` and only overrides `memory`, so thread and resource scoping is safe, but
+  any other field the client sends is forwarded to the agent. That is acceptable for a
+  single-user local app and would not be for a deployed one: the fix is an explicit allowlist
+  of the fields the route forwards. I left it as-is rather than narrowing the type late,
+  because narrowing that object is exactly what breaks `handleChatStream`'s v6 overload
+  resolution (see the comment in `src/app/api/chat/route.ts`) — doing it properly means
+  constructing a correctly-typed params object, not adding a cast.
 
 ### Why I skipped embeddings
 
