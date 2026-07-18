@@ -12,7 +12,7 @@ import type { OfflineCall, OfflineCallExpectation, OfflineCheck } from './types'
 // problem, and every question worth asking here ("does the $419.99 Galaxy survive a
 // maxPrice of 400?") has exactly one correct answer that a judge model could only get
 // wrong. Vitest gives us that answer for free, at zero API cost, in the same runner and
-// the same reporter as the other 136 tests. The online half below still needs the real
+// the same reporter as the rest of the suite. The online half below still needs the real
 // model, but it asserts the plan, which is also deterministic enough to assert directly.
 
 describe('offline eval — deterministic retrieval over the fixture catalog', () => {
