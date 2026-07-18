@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixtureCatalog } from './__fixtures__/catalog';
-import { CATALOG_CACHE_TTL_MS, getCatalog, resetCatalogCache } from './catalog-cache';
+import {
+  CATALOG_CACHE_TTL_MS,
+  getCatalog,
+  getNormalizedCatalog,
+  resetCatalogCache,
+} from './catalog-cache';
 
 type Deferred = {
   promise: Promise<Response>;
@@ -105,5 +110,45 @@ describe('getCatalog', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(products).toHaveLength(fixtureCatalog.length);
+  });
+});
+
+describe('getNormalizedCatalog', () => {
+  it('normalizes every product once per cache load and reuses the same array', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse());
+
+    const first = await getNormalizedCatalog();
+    const second = await getNormalizedCatalog();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+    expect(first).toHaveLength(fixtureCatalog.length);
+    for (const product of first) {
+      expect(typeof product.shippingDays).toBe('number');
+      expect(typeof product.effectivePrice).toBe('number');
+      expect(typeof product.minimumSpend).toBe('number');
+    }
+  });
+
+  it('shares one upstream fetch with the raw catalog accessor', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse());
+
+    const [raw, normalized] = await Promise.all([getCatalog(), getNormalizedCatalog()]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(normalized).toHaveLength(raw.length);
+    expect(normalized[0].id).toBe(raw[0].id);
+  });
+
+  it('renormalizes after the ttl expires', async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation(async () => jsonResponse());
+
+    const first = await getNormalizedCatalog();
+    vi.advanceTimersByTime(CATALOG_CACHE_TTL_MS + 1);
+    const second = await getNormalizedCatalog();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(second).not.toBe(first);
   });
 });

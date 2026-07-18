@@ -1,20 +1,13 @@
 import { openai } from '@ai-sdk/openai';
 import { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';
-import { LibSQLStore } from '@mastra/libsql';
 import { Memory } from '@mastra/memory';
-import path from 'node:path';
 import { getEnv } from '@/lib/env';
+import { COMMERCE_AGENT_ID, commerceAgent } from './agent';
+import { memory, storage } from './memory';
 import { spikeCatalogTool } from './tools/spike-catalog-tool';
 
 export const SPIKE_AGENT_ID = 'spikeAgent';
-
-const storage = new LibSQLStore({
-  id: 'spike-store',
-  url: `file:${path.join(process.cwd(), 'spike-memory.db')}`,
-});
-
-const memory = new Memory({ storage });
 
 const spikeAgent = new Agent({
   id: SPIKE_AGENT_ID,
@@ -27,9 +20,11 @@ const spikeAgent = new Agent({
 });
 
 export const mastra = new Mastra({
-  agents: { [SPIKE_AGENT_ID]: spikeAgent },
+  agents: { [SPIKE_AGENT_ID]: spikeAgent, [COMMERCE_AGENT_ID]: commerceAgent },
   storage,
 });
+
+export { COMMERCE_AGENT_ID, commerceAgent };
 
 export function getSpikeMemory(): Memory {
   return memory;
