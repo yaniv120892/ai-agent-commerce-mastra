@@ -1,7 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, type ChatStatus } from 'ai';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,15 @@ import type { CommerceUIMessage, Conversation } from './types';
 
 type ChatShellProps = {
   initialThreadId: string | null;
+};
+
+type ConversationBodyProps = {
+  messages: CommerceUIMessage[];
+  status: ChatStatus;
+  turnErrorText: string | null;
+  isLoadingHistory: boolean;
+  historyErrorText: string | null;
+  onPickExample: (prompt: string) => void;
 };
 
 const CHAT_TRANSPORT = new DefaultChatTransport<CommerceUIMessage>({ api: '/api/chat' });
@@ -118,8 +127,7 @@ export function ChatShell({ initialThreadId }: ChatShellProps) {
     event.preventDefault();
 
     const prompt = input.trim();
-    const isBusy = status === 'submitted' || status === 'streaming';
-    if (prompt.length === 0 || isBusy) {
+    if (prompt.length === 0 || isTurnInFlight(status)) {
       return;
     }
 
@@ -149,7 +157,7 @@ export function ChatShell({ initialThreadId }: ChatShellProps) {
     return conversation.id;
   };
 
-  const isBusy = status === 'submitted' || status === 'streaming';
+  const isBusy = isTurnInFlight(status);
   const turnErrorText = sendErrorText ?? (error ? error.message : null);
 
   return (
@@ -201,15 +209,6 @@ export function ChatShell({ initialThreadId }: ChatShellProps) {
   );
 }
 
-type ConversationBodyProps = {
-  messages: CommerceUIMessage[];
-  status: ReturnType<typeof useChat<CommerceUIMessage>>['status'];
-  turnErrorText: string | null;
-  isLoadingHistory: boolean;
-  historyErrorText: string | null;
-  onPickExample: (prompt: string) => void;
-};
-
 function ConversationBody({
   messages,
   status,
@@ -260,6 +259,10 @@ function EmptyState({ onPickExample }: { onPickExample: (prompt: string) => void
       </ul>
     </div>
   );
+}
+
+function isTurnInFlight(status: ChatStatus): boolean {
+  return status === 'submitted' || status === 'streaming';
 }
 
 function isAbortError(error: unknown): boolean {
