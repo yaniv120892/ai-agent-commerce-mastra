@@ -103,7 +103,8 @@ recorded in `CLAUDE.md` so later tickets do not rediscover them.
 **`memory.recall()` throws on a thread that does not exist yet.** It raises
 `Error: No thread found with id <threadId>` rather than returning an empty result, so a
 first-visit history fetch 500s. Guard with `memory.getThreadById({ threadId, resourceId })`
-and return `{ messages: [] }` when it is null. See `src/app/api/chat/history/route.ts`.
+and return an empty message list when it is null. The spike routes were retired in
+YAN-36; the guard now lives in `GET` on `src/app/api/chat/route.ts`.
 
 **Mastra persists the assistant message only when the stream completes.** Cards appear in
 the UI at `tool-output-available`, which is well before the turn is durable. A reload
