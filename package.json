@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "studio": "mastra dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -45,6 +46,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "eslint-config-prettier": "^10.1.8",
+    "mastra": "1.19.0",
     "prettier": "^3.9.5",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "shadcn": "^4.13.1",
