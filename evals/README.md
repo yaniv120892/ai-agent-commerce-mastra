@@ -1,6 +1,6 @@
 # Evaluation suite
 
-Fifteen scenarios in one golden dataset (`scenarios.json`), graded by two runners that
+Sixteen scenarios in one golden dataset (`scenarios.json`), graded by two runners that
 answer two different questions.
 
 | Runner                                     | Question it answers                             | Model calls  | Cost   |
@@ -67,23 +67,24 @@ bounded to 6 agent steps so one runaway tool loop cannot blow the budget between
 
 ## Scenario coverage
 
-| Scenario                                | Proves                                                | Offline | Online |
-| --------------------------------------- | ----------------------------------------------------- | ------- | ------ |
-| `simple-category-laptops`               | baseline routing, one call, no invented filters       | yes     | yes    |
-| `price-constraint-smartphone-under-400` | numeric budget becomes `maxPrice` on list price       | yes     | yes    |
-| `rating-constraint-highly-rated`        | calibrated `minRating: 4.5`, not a guessed 4.0        | yes     | yes    |
-| `unrequested-rating-floor-regression`   | **YAN-35 regression** — no unrequested `minRating`    | yes     | yes    |
-| `ambiguous-cheap-and-cool`              | **YAN-35 regression** — assumptions stated out loud   | partial | yes    |
-| `off-catalog-flight`                    | declines with **zero** tool calls                     | no      | yes    |
-| `multi-intent-phone-and-laptop`         | **YAN-35 regression** — two intents, two real calls   | yes     | yes    |
-| `follow-up-cheaper-than-that`           | prior criteria carried forward, only price tightens   | yes     | yes    |
-| `show-me-more-pagination`               | `excludeProductIds` → zero overlap between pages      | yes     | yes    |
-| `brand-exclusion-no-apple`              | title-substring fallback where `brand` is missing     | yes     | yes    |
-| `prompt-injection-in-user-message`      | injected instructions treated as data                 | partial | yes    |
-| `zero-result-query`                     | empty is reported as empty, nothing invented          | yes     | yes    |
-| `min-order-trap-cheap-beauty`           | the $9.99 mascara that really costs $479.52           | yes     | yes    |
-| `upstream-zero-reversed-tokens`         | local resolution finds what `/products/search` cannot | yes     | yes    |
-| `in-stock-only-laptops`                 | availability becomes `inStock`, not a search term     | yes     | yes    |
+| Scenario                                | Proves                                                 | Offline | Online |
+| --------------------------------------- | ------------------------------------------------------ | ------- | ------ |
+| `simple-category-laptops`               | baseline routing, one call, no invented filters        | yes     | yes    |
+| `price-constraint-smartphone-under-400` | numeric budget becomes `maxPrice` on list price        | yes     | yes    |
+| `rating-constraint-highly-rated`        | calibrated `minRating: 4.5`, not a guessed 4.0         | yes     | yes    |
+| `superlative-highest-rated-catalog`     | **YAN-41 regression** — one wide call, never a fan-out | yes     | yes    |
+| `unrequested-rating-floor-regression`   | **YAN-35 regression** — no unrequested `minRating`     | yes     | yes    |
+| `ambiguous-cheap-and-cool`              | **YAN-35 regression** — assumptions stated out loud    | partial | yes    |
+| `off-catalog-flight`                    | declines with **zero** tool calls                      | no      | yes    |
+| `multi-intent-phone-and-laptop`         | **YAN-35 regression** — two intents, two real calls    | yes     | yes    |
+| `follow-up-cheaper-than-that`           | prior criteria carried forward, only price tightens    | yes     | yes    |
+| `show-me-more-pagination`               | `excludeProductIds` → zero overlap between pages       | yes     | yes    |
+| `brand-exclusion-no-apple`              | title-substring fallback where `brand` is missing      | yes     | yes    |
+| `prompt-injection-in-user-message`      | injected instructions treated as data                  | partial | yes    |
+| `zero-result-query`                     | empty is reported as empty, nothing invented           | yes     | yes    |
+| `min-order-trap-cheap-beauty`           | the $9.99 mascara that really costs $479.52            | yes     | yes    |
+| `upstream-zero-reversed-tokens`         | local resolution finds what `/products/search` cannot  | yes     | yes    |
+| `in-stock-only-laptops`                 | availability becomes `inStock`, not a search term      | yes     | yes    |
 
 Three scenarios are regression tests for failures actually observed in YAN-35 and fixed by
 prompt changes:
@@ -100,11 +101,17 @@ silently, and only the **online** runner can see any of them.
 
 ## Results of the live run
 
-**Current status (after YAN-41): 15 of 15 scenarios pass**, 17 model calls, estimated spend
-**$0.036** against the $0.50 cap. All three YAN-35 regression scenarios pass.
+**Current status (after YAN-43): 16 of 16 scenarios pass**, 18 model calls, estimated spend
+**$0.033** against the $0.50 cap. All three YAN-35 regression scenarios pass.
 
 The history below is kept deliberately — the two failures this suite caught, and how one of
 them was diagnosed, are the point of having built it.
+
+> **Known flake.** Roughly one run in three, a single scenario fails in ~20ms having made no
+> model call, and the report shows 15 of 16 executed. That is `generate()` throwing on a
+> transient API error — the suite has no retry around it, so an upstream blip reads as a
+> scenario failure. It lands on a different scenario each time. If a failure has no
+> assertion message and no model call behind it, re-run before believing it.
 
 ### What the first run (YAN-38) found — 14 of 15
 
@@ -138,6 +145,44 @@ The fix declares the enum fields nullable at the tool boundary, so the base node
 `anyOf: [enum, null]` with no colliding sibling, and strips nulls before criteria reach the
 catalog layer. Failure 2 was genuinely a prompt gap: `sort` was undocumented in the prompt
 entirely, and empty `searchTerms` was not described as a valid deliberate query.
+
+### What YAN-43 changed — enforcement, coverage, and a measured ablation
+
+YAN-41 landed the schema fix and three new prompt paragraphs in the same commit, so 15/15
+credited both and nobody knew which half was doing the work. YAN-43 settled it.
+
+**The contract moved into code.** "If `searchTerms` is empty, `categorySlug` must be
+omitted" was a validation rule written as prose in two places and enforced nowhere. It is
+now a `.superRefine` on `resolveProductsInputSchema`. Mastra validates tool input inside
+`execute` and returns the failure as a tool result rather than throwing, so the model reads
+a directed correction and calls again. Verified: the refine leaves the emitted JSON schema
+byte-identical, so the YAN-41 nullable-enum fix is untouched.
+
+**Two coverage gaps were closed first**, because ablating prose the suite does not watch
+proves nothing. There was no whole-catalog superlative scenario at all — the failure the
+README describes above was documented but unguarded — and `ambiguous-cheap-and-cool` never
+asserted that `categorySlug` was omitted, so the exact regression YAN-41 fixed was not
+actually being tested. Both are now covered, which required a new `searchTermsEmpty`
+expectation key; `searchTermsIncludeAnyOf` could only assert inclusion, never emptiness.
+
+**Then the prompt was ablated section by section, one live run each.**
+
+| Cut                                               | Result                                                                        |
+| ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Five `categorySlug` paragraphs → one              | **16/16 — removed.** The refine enforces the rule the prose was pleading for. |
+| Call mechanics duplicated in the tool description | **16/16 — removed.** Input tokens fell 140k → 109k per run (−22%).            |
+| §"Superlatives about the whole catalog"           | **Regressed twice — put back.**                                               |
+
+The last row is the point. Without that section the model answers "your highest rated
+products" with `searchTerms: ["product"]` and no rating floor — the YAN-41 fan-out failure,
+reproduced on two consecutive runs. It is the one section proven to carry its weight, and
+`instructions.test.ts` now guards it for free so it cannot be deleted again without a paid
+run to notice.
+
+The rule this establishes: the tool description is canonical for **how to shape a call**,
+colocated with the schema the model fills in. The system prompt keeps only what the tool
+description cannot know — catalog calibration, restraint, and per-request-kind behaviour.
+Anything added to either should be ablated the same way before it stays.
 
 ### A runner detail worth keeping
 
@@ -191,7 +236,7 @@ rather than living only in this file.
 
 | File               | Role                                                               |
 | ------------------ | ------------------------------------------------------------------ |
-| `scenarios.json`   | The golden dataset — 15 scenarios, plan and selection expectations |
+| `scenarios.json`   | The golden dataset — 16 scenarios, plan and selection expectations |
 | `types.ts`         | Zod schemas and types for the dataset                              |
 | `scenarios.ts`     | Loads and validates the dataset; normalizes the fixture catalog    |
 | `eval-offline.ts`  | Deterministic runner over `resolveProducts`                        |
