@@ -27,6 +27,13 @@ Referenced directly by later tickets.
 
 **Exact enum→numeric mappings (exhaustive across all 194):**
 
-- shipping → days: overnight→1, 1-2 business days→2, 3-5 business days→5, 1 week→7, 2 weeks→14, 1 month→30
-- return → days: No return policy→0, 7 days→7, 30 days→30, 60 days→60, 90 days→90
-- warranty → months: 1 week→0.25, 1 month→1, 3 months→3, 6 months→6, 1 year→12, 2 year→24, 3 year→36, 5 year→60, Lifetime→Infinity
+- shipping → days (6 values): overnight→1, 1-2 business days→2, 3-5 business days→5, 1 week→7, 2 weeks→14, 1 month→30
+- return → days (5 values): No return policy→0, 7 days→7, 30 days→30, 60 days→60, 90 days→90
+- warranty → months (10 values): No warranty→0, 1 week→0.25, 1 month→1, 3 months→3, 6 months→6, 1 year→12, 2 year→24, 3 year→36, 5 year→60, Lifetime→Infinity
+
+All enum values above carry the literal `warranty` / `return policy` suffix as returned by the
+API (e.g. `'No warranty'`, `'Lifetime warranty'`, `'7 days return policy'`).
+
+**Rounding rule:** `effectivePrice` and `minimumSpend` are rounded to 2 decimal places.
+IEEE-754 makes `9.99 * 48` evaluate to `479.52000000000004` in JS; the stored and displayed
+value is `479.52`.
