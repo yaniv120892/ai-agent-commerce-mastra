@@ -7,7 +7,18 @@ import { COMMERCE_AGENT_ID, getCommerceMemory, mastra } from '@/mastra';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  const params = await request.json();
+  // Kept untyped: handleChatStream's v6 overload only resolves against the raw
+  // request body shape, and narrowing it here silently selects the v5 overload.
+  let params;
+  try {
+    params = await request.json();
+  } catch (error) {
+    return Response.json(
+      { error: `Request body must be valid JSON: ${describeError(error)}` },
+      { status: 400 },
+    );
+  }
+
   const threadId = params?.threadId;
 
   if (typeof threadId !== 'string' || threadId.length === 0) {
@@ -28,7 +39,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await backfillTitle(thread, params?.messages);
+    await backfillTitle(memory, thread, params?.messages);
 
     const stream = await handleChatStream({
       mastra,
@@ -88,8 +99,12 @@ export async function GET(request: Request) {
   }
 }
 
+type CommerceMemory = ReturnType<typeof getCommerceMemory>;
+type CommerceThread = Awaited<ReturnType<CommerceMemory['getThreadById']>>;
+
 async function backfillTitle(
-  thread: Awaited<ReturnType<ReturnType<typeof getCommerceMemory>['getThreadById']>>,
+  memory: CommerceMemory,
+  thread: CommerceThread,
   messages: unknown,
 ): Promise<void> {
   if (!thread || thread.title) {
@@ -101,7 +116,7 @@ async function backfillTitle(
     return;
   }
 
-  await getCommerceMemory().saveThread({
+  await memory.saveThread({
     thread: { ...thread, title: deriveConversationTitle(latestUserText) },
   });
 }
