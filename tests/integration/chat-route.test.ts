@@ -9,10 +9,31 @@ import { resetCatalogCache } from '@/catalog/catalog-cache';
  * LibSQL memory store and the real `resolveProducts` tool. Exactly two things are
  * doubled: the language model (a `MockLanguageModelV4`, so no OpenAI request is ever
  * made) and the catalog HTTP fetch.
- *
- * The file sits under tests/unit because that is the only `tests/**` glob in
- * vitest.config.ts, which this ticket may not edit.
  */
+
+type StreamChunk = {
+  type: string;
+  toolName: string | undefined;
+  output: unknown;
+  errorText: string | undefined;
+};
+
+type HistoryPart = {
+  type: string;
+  state: string | undefined;
+  output: unknown;
+  text: string | undefined;
+};
+
+type HistoryMessage = {
+  role: string;
+  parts: HistoryPart[];
+};
+
+type ToolOutput = {
+  products: { title: string; price: number }[];
+  resultCount: number;
+};
 
 const TOOL_NAME = 'resolveProducts';
 const SMARTPHONE_PROMPT = 'I need a smartphone under $400';
@@ -269,30 +290,6 @@ describe('error surfaces', () => {
     expect(String(errorChunk.errorText)).toContain('could not finish this reply');
   }, 30_000);
 });
-
-type StreamChunk = {
-  type: string;
-  toolName: string | undefined;
-  output: unknown;
-  errorText: string | undefined;
-};
-
-type HistoryPart = {
-  type: string;
-  state: string | undefined;
-  output: unknown;
-  text: string | undefined;
-};
-
-type HistoryMessage = {
-  role: string;
-  parts: HistoryPart[];
-};
-
-type ToolOutput = {
-  products: { title: string; price: number }[];
-  resultCount: number;
-};
 
 function catalogResponse(): Response {
   return new Response(JSON.stringify({ products: fixtureCatalog }), {

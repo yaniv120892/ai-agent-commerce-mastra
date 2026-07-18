@@ -337,15 +337,15 @@ function readProducts(toolResults: unknown): ProductCard[] {
 // The model emits `"maxPrice": null` for every optional field it chose not to set, and
 // zod's `.optional()` rejects null outright. Left in place, every tool call fails to parse
 // and the eval reports "no tool call" for a turn that plainly made one.
-function withoutNullFields(args: unknown): unknown {
-  if (typeof args !== 'object' || args === null) {
-    return args;
+function withoutNullFields(toolCallArguments: unknown): unknown {
+  if (typeof toolCallArguments !== 'object' || toolCallArguments === null) {
+    return toolCallArguments;
   }
 
   const populated: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(args)) {
+  for (const [field, value] of Object.entries(toolCallArguments)) {
     if (value !== null) {
-      populated[key] = value;
+      populated[field] = value;
     }
   }
 

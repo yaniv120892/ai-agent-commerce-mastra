@@ -22,6 +22,8 @@ import {
 
 type PromptMessage = MockLanguageModelV4['doGenerateCalls'][number]['prompt'][number];
 
+type ToolReference = { kind: 'call' | 'result'; toolCallId: string; toolName: string };
+
 const RESOURCE_ID = 'local-user';
 
 // Every optional field the model is asked to emit, all null. OpenAI structured
@@ -154,8 +156,6 @@ function makeAgent(
   });
 }
 
-type ToolReference = { kind: 'call' | 'result'; toolCallId: string; toolName: string };
-
 function toolReferences(prompt: PromptMessage[]): ToolReference[] {
   const references: ToolReference[] = [];
 
@@ -245,8 +245,14 @@ describe('null stripping between the model and tool execute', () => {
 
     expect(recordedInputs).toHaveLength(1);
     const received = recordedInputs[0];
+    if (typeof received !== 'object' || received === null) {
+      throw new Error(
+        `execute received a non-object input (received: ${JSON.stringify(received)})`,
+      );
+    }
+
     expect(received).toEqual({ searchTerms: ['mascara'] });
-    for (const [field, value] of Object.entries(received as Record<string, unknown>)) {
+    for (const [field, value] of Object.entries(received)) {
       expect(value, `${field} reached execute as null`).not.toBeNull();
     }
 

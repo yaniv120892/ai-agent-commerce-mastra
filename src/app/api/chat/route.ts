@@ -4,6 +4,9 @@ import { createUIMessageStreamResponse } from 'ai';
 import { deriveConversationTitle, LOCAL_RESOURCE_ID } from '@/lib/conversation';
 import { COMMERCE_AGENT_ID, getCommerceMemory, mastra } from '@/mastra';
 
+type CommerceMemory = ReturnType<typeof getCommerceMemory>;
+type CommerceThread = Awaited<ReturnType<CommerceMemory['getThreadById']>>;
+
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
@@ -98,9 +101,6 @@ export async function GET(request: Request) {
     );
   }
 }
-
-type CommerceMemory = ReturnType<typeof getCommerceMemory>;
-type CommerceThread = Awaited<ReturnType<CommerceMemory['getThreadById']>>;
 
 async function backfillTitle(
   memory: CommerceMemory,

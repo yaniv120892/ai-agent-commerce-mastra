@@ -6,6 +6,11 @@ import type {
 
 type Prompt = ProcessLLMRequestArgs['prompt'];
 
+// The processor reads nothing but the prompt, so it declares nothing but the prompt.
+// Method parameters are bivariant, so this still satisfies `Processor`, and callers
+// (including tests) no longer have to fabricate a whole request to exercise it.
+type PromptOnlyRequest = { prompt: Prompt };
+
 export const KNOWN_TOOLS_ONLY_PROCESSOR_ID = 'known-tools-only';
 
 /**
@@ -28,7 +33,7 @@ export class KnownToolsOnlyProcessor implements Processor {
     this.knownToolNames = new Set(knownToolNames);
   }
 
-  public processLLMRequest({ prompt }: ProcessLLMRequestArgs): ProcessLLMRequestResult {
+  public processLLMRequest({ prompt }: PromptOnlyRequest): ProcessLLMRequestResult {
     const staleToolCallIds = this.collectStaleToolCallIds(prompt);
     if (staleToolCallIds.size === 0) {
       return undefined;

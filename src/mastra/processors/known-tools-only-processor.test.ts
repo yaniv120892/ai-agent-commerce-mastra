@@ -6,7 +6,7 @@ type Prompt = ProcessLLMRequestArgs['prompt'];
 
 function runProcessor(knownToolNames: string[], prompt: Prompt): Prompt {
   const processor = new KnownToolsOnlyProcessor(knownToolNames);
-  const result = processor.processLLMRequest({ prompt } as ProcessLLMRequestArgs);
+  const result = processor.processLLMRequest({ prompt });
 
   return result?.prompt ?? prompt;
 }
