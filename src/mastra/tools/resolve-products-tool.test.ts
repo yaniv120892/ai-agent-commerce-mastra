@@ -2,10 +2,12 @@ import { noopObserve } from '@mastra/core/tools';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixtureCatalog } from '@/catalog/__fixtures__/catalog';
 import { resetCatalogCache } from '@/catalog/catalog-cache';
-import { retrievalCriteriaSchema, type RetrievalCriteria } from '@/catalog/types';
+import { retrievalCriteriaSchema } from '@/catalog/types';
 import { resolveProductsTool } from './resolve-products-tool';
 import {
+  resolveProductsInputSchema,
   resolveProductsOutputSchema,
+  type ResolveProductsInput,
   type ResolveProductsOutput,
 } from './resolve-products-tool.types';
 
@@ -13,7 +15,7 @@ const fetchMock = vi.fn<typeof fetch>();
 
 // createTool types execute's result as `void | Output`; parsing through the output
 // schema narrows it and asserts the tool actually honours its declared contract.
-async function executeTool(criteria: RetrievalCriteria): Promise<ResolveProductsOutput> {
+async function executeTool(criteria: ResolveProductsInput): Promise<ResolveProductsOutput> {
   const result = await resolveProductsTool.execute!(criteria, { observe: noopObserve });
 
   return resolveProductsOutputSchema.parse(result);
@@ -39,9 +41,24 @@ afterEach(() => {
 });
 
 describe('resolveProductsTool', () => {
-  it('exposes the shared retrieval criteria schema as its input schema', () => {
+  it('accepts the shared retrieval criteria, and additionally a null enum field', () => {
     expect(resolveProductsTool.id).toBe('resolveProducts');
-    expect(resolveProductsTool.inputSchema).toBe(retrievalCriteriaSchema);
+    expect(resolveProductsInputSchema.safeParse({ searchTerms: ['mascara'] }).success).toBe(true);
+
+    // The input schema deliberately diverges from the shared one on exactly this point:
+    // OpenAI's strict transform cannot express an omitted optional enum, so the model can
+    // only say "no category" by sending null. The shared schema still rejects it, which is
+    // why the tool strips nulls before the criteria reach the catalog layer.
+    const nulledEnums = { searchTerms: [], categorySlug: null, sort: null };
+    expect(resolveProductsInputSchema.safeParse(nulledEnums).success).toBe(true);
+    expect(retrievalCriteriaSchema.safeParse(nulledEnums).success).toBe(false);
+  });
+
+  it('treats a null categorySlug as no category filter rather than as a filter matching nothing', async () => {
+    const result = await executeTool({ searchTerms: ['mascara'], categorySlug: null, sort: null });
+
+    expect(result.products.length).toBeGreaterThan(0);
+    expect(result.criteria).toEqual({ searchTerms: ['mascara'] });
   });
 
   it('returns product cards for terms that match the catalog', async () => {
