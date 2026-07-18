@@ -92,6 +92,45 @@
       }
     },
     {
+      "id": "superlative-highest-rated-catalog",
+      "query": "what are your highest rated products?",
+      "proves": "REGRESSION (YAN-41): a whole-catalog superlative is answered by one wide call — empty searchTerms, no categorySlug, rating-desc plus the calibrated 4.5 floor — rather than fanning out into one narrow call per guessed category. The observed failure produced seven calls, each carrying the placeholder term [\"product\"].",
+      "regressionOf": "YAN-41: superlative queries fanned out across guessed categories",
+      "expect": {
+        "toolCalled": true,
+        "toolCallCount": 1,
+        "criteria": {
+          "searchTermsEmpty": true,
+          "minRatingEquals": 4.5,
+          "requiredFields": ["minRating", "sort"],
+          "forbiddenFields": ["categorySlug"]
+        },
+        "toolResults": { "totalProductsAtLeast": 3 },
+        "requiredAnyOf": ["4\\.5", "highest[- ]rated", "top[- ]rated", "rating"]
+      },
+      "offline": {
+        "note": "Offline asserts the shape the one wide call must produce: ranging over the whole catalog by rating returns a spread, and the same call narrowed to a single guessed category collapses it — which is the failure the online assertion is guarding against.",
+        "calls": [
+          {
+            "label": "one-wide-call",
+            "criteria": { "searchTerms": [], "minRating": 4.5, "sort": "rating-desc" },
+            "expect": { "everyRatingAtLeast": 4.5, "nonEmpty": true }
+          },
+          {
+            "label": "same-call-narrowed-to-a-guessed-category",
+            "criteria": {
+              "searchTerms": [],
+              "minRating": 4.5,
+              "sort": "rating-desc",
+              "categorySlug": "beauty"
+            },
+            "expect": { "everyRatingAtLeast": 4.5 }
+          }
+        ],
+        "expect": { "laterCallReturnsFewer": true }
+      }
+    },
+    {
       "id": "unrequested-rating-floor-regression",
       "query": "I need a laptop for work",
       "proves": "REGRESSION (YAN-35): an ordinary request must not acquire minRating on the model's own initiative. The observed failure collapsed 5 laptops to 1.",
@@ -132,7 +171,7 @@
       "regressionOf": "YAN-35: vague requests under-disclosed their assumptions",
       "expect": {
         "toolCalled": true,
-        "criteria": { "forbiddenFields": ["minRating"] },
+        "criteria": { "forbiddenFields": ["minRating", "categorySlug"] },
         "toolResults": { "totalProductsAtLeast": 3 },
         "requiredAnyOf": [
           "assum",

@@ -22,6 +22,7 @@ const criteriaExpectationSchema = z.object({
   minRatingEquals: z.number().optional(),
   inStock: z.boolean().optional(),
   searchTermsIncludeAnyOf: z.string().array().optional(),
+  searchTermsEmpty: z.boolean().optional(),
   excludeBrandsMatchAnyOf: z.string().array().optional(),
   excludesPreviouslyShownIds: z.boolean().optional(),
   requiredFields: z.enum(CRITERIA_FIELDS).array().optional(),
