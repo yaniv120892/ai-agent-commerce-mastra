@@ -1,3 +1,4 @@
+import { CATEGORY_SLUGS } from './types';
 import type {
   NormalizedProduct,
   RawProduct,
@@ -9,38 +10,45 @@ import type {
 export function normalizeProduct(raw: RawProduct): NormalizedProduct {
   return {
     ...raw,
-    shippingDays: lookupOrThrow(SHIPPING_DAYS, raw.shippingInformation, {
-      fieldName: 'shippingInformation',
-      productId: raw.id,
-    }),
-    returnDays: lookupOrThrow(RETURN_DAYS, raw.returnPolicy, {
-      fieldName: 'returnPolicy',
-      productId: raw.id,
-    }),
-    warrantyMonths: lookupOrThrow(WARRANTY_MONTHS, raw.warrantyInformation, {
-      fieldName: 'warrantyInformation',
-      productId: raw.id,
-    }),
+    shippingDays: SHIPPING_DAYS.get(raw.shippingInformation),
+    returnDays: RETURN_DAYS.get(raw.returnPolicy),
+    warrantyMonths: WARRANTY_MONTHS.get(raw.warrantyInformation),
     effectivePrice: roundToCents(raw.price * (1 - raw.discountPercentage / 100)),
     minimumSpend: roundToCents(raw.price * raw.minimumOrderQuantity),
   };
 }
 
-export class UnknownCatalogEnumValueError extends Error {
-  public readonly fieldName: string;
-  public readonly value: string;
-  public readonly productId: number;
+export function collectUnknownValues(products: RawProduct[]): Record<string, string[]> {
+  const unknownByField: Record<string, Set<string>> = {
+    category: new Set(),
+    shippingInformation: new Set(),
+    returnPolicy: new Set(),
+    warrantyInformation: new Set(),
+  };
 
-  public constructor(fieldName: string, value: string, productId: number, knownValues: string[]) {
-    super(
-      `Unrecognised ${fieldName} value "${value}" on product ${productId}. ` +
-        `Known values: ${knownValues.join(', ')}.`,
-    );
-    this.name = 'UnknownCatalogEnumValueError';
-    this.fieldName = fieldName;
-    this.value = value;
-    this.productId = productId;
+  for (const product of products) {
+    if (!KNOWN_CATEGORIES.has(product.category)) {
+      unknownByField.category.add(product.category);
+    }
+    if (!SHIPPING_DAYS.has(product.shippingInformation)) {
+      unknownByField.shippingInformation.add(product.shippingInformation);
+    }
+    if (!RETURN_DAYS.has(product.returnPolicy)) {
+      unknownByField.returnPolicy.add(product.returnPolicy);
+    }
+    if (!WARRANTY_MONTHS.has(product.warrantyInformation)) {
+      unknownByField.warrantyInformation.add(product.warrantyInformation);
+    }
   }
+
+  const populatedFields: Record<string, string[]> = {};
+  for (const [fieldName, values] of Object.entries(unknownByField)) {
+    if (values.size > 0) {
+      populatedFields[fieldName] = [...values].sort();
+    }
+  }
+
+  return populatedFields;
 }
 
 const SHIPPING_DAYS_BY_INFORMATION = {
@@ -81,22 +89,7 @@ const WARRANTY_MONTHS: ReadonlyMap<string, number> = new Map(
   Object.entries(WARRANTY_MONTHS_BY_INFORMATION),
 );
 
-type LookupContext = {
-  fieldName: string;
-  productId: number;
-};
-
-function lookupOrThrow(
-  mapping: ReadonlyMap<string, number>,
-  value: string,
-  { fieldName, productId }: LookupContext,
-): number {
-  const numericValue = mapping.get(value);
-  if (numericValue === undefined) {
-    throw new UnknownCatalogEnumValueError(fieldName, value, productId, [...mapping.keys()]);
-  }
-  return numericValue;
-}
+const KNOWN_CATEGORIES: ReadonlySet<string> = new Set(CATEGORY_SLUGS);
 
 function roundToCents(value: number): number {
   return Math.round(value * 100) / 100;

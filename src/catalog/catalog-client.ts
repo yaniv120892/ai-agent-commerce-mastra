@@ -27,6 +27,14 @@ const SELECTED_FIELDS = [
 export const CATALOG_URL = `${CATALOG_ORIGIN}/products?limit=0&select=${SELECTED_FIELDS.join(',')}`;
 
 const MAX_LOGGED_PAYLOAD_LENGTH = 500;
+const MAX_REPORTED_REJECTIONS = 5;
+const MINIMUM_VALID_FRACTION = 0.5;
+
+export type CatalogParseResult = {
+  products: RawProduct[];
+  totalReceived: number;
+  rejections: string[];
+};
 
 const catalogEnvelopeSchema = z.object({
   products: z.unknown().array(),
@@ -57,7 +65,7 @@ export class CatalogPayloadError extends Error {
   }
 }
 
-export async function fetchRawProducts(): Promise<RawProduct[]> {
+export async function fetchRawProducts(): Promise<CatalogParseResult> {
   const payload = await requestCatalogWithOneRetry();
   return parseProducts(payload);
 }
@@ -101,7 +109,7 @@ async function requestCatalogOnce(): Promise<unknown> {
   }
 }
 
-function parseProducts(payload: unknown): RawProduct[] {
+function parseProducts(payload: unknown): CatalogParseResult {
   const envelope = catalogEnvelopeSchema.safeParse(payload);
   if (!envelope.success) {
     throw new CatalogPayloadError(
@@ -111,17 +119,44 @@ function parseProducts(payload: unknown): RawProduct[] {
   }
 
   const products: RawProduct[] = [];
+  const rejections: string[] = [];
   for (const [index, entry] of envelope.data.products.entries()) {
     const product = rawProductSchema.safeParse(entry);
-    if (!product.success) {
-      throw new CatalogPayloadError(
-        `Catalog product at index ${index} from ${CATALOG_URL} failed validation (${formatIssues(product.error)}), received: ${describePayload(entry)}`,
-        { receivedPayload: entry },
-      );
+    if (product.success) {
+      products.push(product.data);
+    } else {
+      rejections.push(`index ${index} (${formatIssues(product.error)})`);
     }
-    products.push(product.data);
   }
-  return products;
+
+  const totalReceived = envelope.data.products.length;
+  if (isBelowValidFloor(products.length, totalReceived)) {
+    throw new CatalogPayloadError(
+      `Catalog response from ${CATALOG_URL} yielded only ${products.length} valid products out of ${totalReceived}, ` +
+        `below the ${MINIMUM_VALID_FRACTION} floor — treating this as a changed API shape rather than catalog drift. ` +
+        `Rejections: ${describeRejections(rejections)}`,
+      { receivedPayload: payload },
+    );
+  }
+
+  return { products, totalReceived, rejections };
+}
+
+// One unrecognised product is catalog drift and must not fail the load; a payload that is
+// mostly unparseable is a changed API shape and must fail loudly.
+function isBelowValidFloor(validCount: number, totalReceived: number): boolean {
+  if (totalReceived === 0) {
+    return false;
+  }
+  return validCount / totalReceived < MINIMUM_VALID_FRACTION;
+}
+
+function describeRejections(rejections: string[]): string {
+  if (rejections.length <= MAX_REPORTED_REJECTIONS) {
+    return rejections.join('; ');
+  }
+  const reported = rejections.slice(0, MAX_REPORTED_REJECTIONS).join('; ');
+  return `${reported}; … and ${rejections.length - MAX_REPORTED_REJECTIONS} more`;
 }
 
 function formatIssues(error: z.ZodError): string {
