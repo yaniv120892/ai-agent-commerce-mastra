@@ -98,34 +98,46 @@ prompt changes:
 All three were fixed in the system prompt. These scenarios are what stops them coming back
 silently, and only the **online** runner can see any of them.
 
-## Results of the live run (YAN-38)
+## Results of the live run
 
-The online suite **was executed** against the real model (`gpt-5.4-mini`) and the live
-catalog: **14 of 15 scenarios pass**, 17 model calls, ~93.5K input / 2.7K output tokens,
-estimated spend **$0.03** against the $0.50 cap. All three YAN-35 regression scenarios
-pass — the prompt fixes hold.
+**Current status (after YAN-41): 15 of 15 scenarios pass**, 17 model calls, estimated spend
+**$0.036** against the $0.50 cap. All three YAN-35 regression scenarios pass.
 
-Two findings came out of it. Neither is a tooling problem, and neither is fixed here:
-retuning the system prompt belongs to the prompt ticket, not to the eval ticket.
+The history below is kept deliberately — the two failures this suite caught, and how one of
+them was diagnosed, are the point of having built it.
 
-**1. `ambiguous-cheap-and-cool` fails, and the failure is real.** The model discloses its
-assumptions well — "I read 'cheap and cool' as under $50 and went for home decor" — so the
-YAN-35 disclosure fix holds. But it also guesses a _category_ on top of the budget and
-comes back with 2 products out of 194. The system prompt explicitly warns against this
-("Keep vague-request searches wide… guessing a budget and a category and a rating floor all
-at once is how you end up with one result"), and the model does not obey it. Reproduced on
-three consecutive runs, landing on a different category each time (`tops`, `home-decoration`
-twice). The scenario asserts at least 3 products precisely because that prompt instruction
-exists; it is left failing rather than relaxed, because an eval tuned until it agrees with
-current behaviour tests nothing.
+### What the first run (YAN-38) found — 14 of 15
 
-**2. A broad superlative query fans out into junk narrow searches.** Discovered while
-building the pagination scenario, not currently asserted. "What are your highest rated
-products?" produced **seven** tool calls — one per guessed `categorySlug`, each with the
-literal search term `["product"]` lifted from the query — and six of the seven returned
-zero results. The correct plan is one broad call with `minRating: 4.5` and no category at
-all. This is the same family as the YAN-35 over-filtering failure, reached from a different
-direction. Worth a prompt fix and a scenario of its own once fixed.
+**1. `ambiguous-cheap-and-cool` failed, and the failure was real.** The model disclosed its
+assumptions well — "I read 'cheap and cool' as under $50 and went for home decor" — but it
+also guessed a _category_ on top of the budget and came back with 2 products out of 194.
+The system prompt explicitly warned against this, and the model did not obey. Reproduced on
+three consecutive runs, landing on a different category each time (`tops`,
+`home-decoration` twice). It was **left failing rather than relaxed**, because an eval
+tuned until it agrees with current behaviour tests nothing.
+
+**2. A broad superlative query fanned out into junk narrow searches.** "What are your
+highest rated products?" produced **seven** tool calls — one per guessed `categorySlug`,
+each with the literal search term `["product"]` lifted from the query — and six of the seven
+returned zero results.
+
+### How they were fixed (YAN-41) — now 15 of 15
+
+Failure 1 was **not a prompt problem**, which is why two rounds of increasingly forceful
+wording could not move it. Obeying the instruction was **unrepresentable in the schema**:
+OpenAI's strict function-calling transform moves every property into `required` and
+expresses optionality as `anyOf: [T, null]`, but for an **enum** it leaves the original
+non-nullable `enum` keyword as a _sibling_ of that `anyOf`. Sibling keywords are ANDed,
+`null` satisfies neither branch, and the field is required — so there was no legal way to
+omit `categorySlug`. The model was not being disobedient; it was choosing under duress.
+
+The evidence was already in this suite's own data: across every run `categorySlug` carried
+a real value and **never** a null, while every other optional field came back null.
+
+The fix declares the enum fields nullable at the tool boundary, so the base node is already
+`anyOf: [enum, null]` with no colliding sibling, and strips nulls before criteria reach the
+catalog layer. Failure 2 was genuinely a prompt gap: `sort` was undocumented in the prompt
+entirely, and empty `searchTerms` was not described as a valid deliberate query.
 
 ### A runner detail worth keeping
 
