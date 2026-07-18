@@ -121,6 +121,7 @@ ai@7.0.31   @ai-sdk/openai@4.0.16   @ai-sdk/react@4.0.34   zod@4.4.3
 | Command                | Purpose                     |
 | ---------------------- | --------------------------- |
 | `npm run dev`          | Dev server (Turbopack)      |
+| `npm run studio`       | Mastra Studio (port 4111)   |
 | `npm run build`        | Production build            |
 | `npm test`             | Vitest unit tests           |
 | `npm run test:e2e`     | Playwright end-to-end tests |
