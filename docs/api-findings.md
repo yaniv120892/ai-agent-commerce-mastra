@@ -19,11 +19,14 @@ API behaviour that contradicts them.
 
 ## Supporting details
 
-- The 24 category slugs: `beauty, fragrances, furniture, groceries, home-decoration, kitchen-accessories, laptops, mens-shirts, mens-shoes, mens-watches, mobile-accessories, motorcycle, skin-care, smartphones, sports-accessories, sunglasses, tablets, tops, vehicle, womens-bags, womens-dresses, womens-jewellery, womens-shoes, womens-watches`
-- Price range $0.79–$36,999.99, median $34.99
-- Availability: 176 In Stock, 14 Low Stock, 4 Out of Stock
-- Categories with no brand data at all: kitchen-accessories (30), groceries (27), sports-accessories (17)
-- Exact enum→numeric mappings:
-  - shipping: overnight→1, 1-2 business days→2, 3-5 business days→5, 1 week→7, 2 weeks→14, 1 month→30
-  - return: No return policy→0, 7 days→7, 30 days→30, 60 days→60, 90 days→90
-  - warranty (months): 1 week→0.25, 1 month→1, 3 months→3, 6 months→6, 1 year→12, 2 year→24, 3 year→36, 5 year→60, Lifetime→Infinity
+Referenced directly by later tickets.
+
+**The 24 category slugs:** `beauty, fragrances, furniture, groceries, home-decoration, kitchen-accessories, laptops, mens-shirts, mens-shoes, mens-watches, mobile-accessories, motorcycle, skin-care, smartphones, sports-accessories, sunglasses, tablets, tops, vehicle, womens-bags, womens-dresses, womens-jewellery, womens-shoes, womens-watches`
+
+**Distribution:** price $0.79–$36,999.99 (median $34.99) · availability 176 In Stock / 14 Low Stock / 4 Out of Stock · categories with zero brand data: kitchen-accessories (30), groceries (27), sports-accessories (17)
+
+**Exact enum→numeric mappings (exhaustive across all 194):**
+
+- shipping → days: overnight→1, 1-2 business days→2, 3-5 business days→5, 1 week→7, 2 weeks→14, 1 month→30
+- return → days: No return policy→0, 7 days→7, 30 days→30, 60 days→60, 90 days→90
+- warranty → months: 1 week→0.25, 1 month→1, 3 months→3, 6 months→6, 1 year→12, 2 year→24, 3 year→36, 5 year→60, Lifetime→Infinity
