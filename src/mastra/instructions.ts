@@ -1,52 +1,8 @@
 import { CATEGORY_SLUGS } from '@/catalog/types';
 
-// Every section here was ablated against `npm run eval:online` rather than kept on faith.
-// The call-mechanics sections that used to live here were removed because the tool's own
-// description already carries them and 16/16 held without them. "Superlatives about the
-// whole catalog" was removed too, regressed the suite twice running — the model answered
-// with searchTerms ["product"] and no rating floor, which is the fan-out failure —
-// and was put back. "How many there are" was ablated over three runs per variant and is what
-// survived: at full length (1045 chars) and at this length (361) every affected scenario
-// passed 3/3, while cutting it entirely dropped truncation-invented-inventory-count to 1/3.
-// The paragraphs that did NOT survive were the ones explaining totalMatchedWithoutCategoryFilter
-// and completeness — both scenarios pass 3/3 with no prose at all, because a tool result
-// showing 1 next to 4, or 17 next to 6, is a visible contradiction the model acts on unaided.
-// Only counting stock needed saying: nothing in the data marks which number answers "how many
-// do you carry". The ambiguous-slug paragraph earns its place the same way: without it the
-// model chose mens-watches for a bare "watches" on 4 of 4 runs, and with it 0 of 3.
-// "Requests this catalog cannot serve" used to forbid the tool call outright ("do not run a
-// search you already know will be empty"). Ablated over three runs per variant: with the
-// no-search rule restored, all three false-decline scenarios fail 0/3 and off-catalog-flight
-// fails too; with it deleted, all four pass 3/3. That rule asked the model to predict emptiness
-// before retrieving, which it cannot do — it has no way to tell a kind of commerce the store
-// does not serve (flights) from a product it simply has not checked (ice cube trays) — so it
-// denied stocking three products the catalog carries, with no tool call behind the denial for
-// anything downstream to catch. Retrieval is local and cached, so the rule saved one
-// round-trip and cost real sales.
-// Working memory added exactly one thing here, and only after ablating three variants over
-// the two eviction scenarios: the expanded "show me more" bullet held 3/3, reverting it to
-// its original one-line form dropped to 2/3, and two further paragraphs spelling out that
-// recorded state stays in force until the shopper changes it also held 3/3 — so those were
-// cut as prompt tax. Mastra injects its own working-memory block on every turn, which
-// already tells the model to store and read state; what that block cannot know is which
-// recorded field feeds which tool argument, and that is the only part worth paying for.
-// remainingAfterThisPage added one clause to "How many there are", and it was measured in the
-// prescribed order — field shipped alone first, prose only after. Three runs per variant over
-// pagination-remaining-count-honest plus the three scenarios it could disturb: with the clause
-// 3/3 on all four, with it cut 2/3 on the new scenario and 3/3 on the rest. Read that gap as
-// weak on its own — one run in three is exactly the noise floor elsewhere in this suite — but
-// it agrees with the mechanism, which is why it stayed. This section is an *enumeration* of
-// which counts license a claim, so a count absent from the list reads as one that does not;
-// the failing run made no count claim at all rather than a false one. Note what the field did
-// achieve unaided: across six runs in both variants the overstatement never recurred once, so
-// the structure fixed the falsehood and the prose only fixed the silence.
-// Anything added here should be ablated the same way before it stays.
-// The decline-wording paragraph was ablated separately, twelve runs per variant: with it
-// off-catalog-flight passes 11/12, without it 7/12, and the failures without it are all the
-// same shape — "I searched, but nothing matches; the closest result was a mobile-accessories
-// item" — which narrates the tooling at a shopper who asked about flights and never actually
-// says the store does not sell them. Searching first made the agent honest; it did not make
-// it tactful, and that needed saying.
+// Every section below was ablated against `npm run eval:online` rather than kept on faith, and
+// anything added here must be ablated the same way before it stays. The per-section verdicts and
+// their measurements live in evals/README.md, "The prompt ablation ledger".
 export const COMMERCE_AGENT_INSTRUCTIONS = `You are a shopping copilot for an online store. You help people find products in one specific catalog and nothing else.
 
 # The only way you learn about products
