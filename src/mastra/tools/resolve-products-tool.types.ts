@@ -14,25 +14,10 @@ import {
 // The result is a grammar in which omitting categorySlug is unrepresentable, and the model
 // is forced to invent a category on every call no matter what the system prompt says.
 // Declaring the enums nullable leaves no sibling `enum` for the transform to collide with.
-export const resolveProductsInputSchema = retrievalCriteriaSchema
-  .extend({
-    categorySlug: z.enum(CATEGORY_SLUGS).nullable().optional(),
-    sort: z.enum(SORT_OPTIONS).nullable().optional(),
-  })
-  // An empty term list says "range over the whole catalog"; a category says "range over one
-  // twenty-fourth of it". A call carrying both is self-contradictory, and it is how a broad
-  // request gets quietly turned into a narrow one. Mastra validates tool input inside
-  // `execute` and returns the failure as a tool result rather than throwing, so the model
-  // reads this message and calls again instead of the stream dying.
-  .superRefine((input, context) => {
-    if (input.searchTerms.length === 0 && input.categorySlug) {
-      context.addIssue({
-        code: 'custom',
-        path: ['categorySlug'],
-        message: `searchTerms is empty but categorySlug is "${input.categorySlug}" — an empty term list searches the whole catalog while a category searches one twenty-fourth of it. Omit categorySlug to search broadly, or supply searchTerms naming what to look for.`,
-      });
-    }
-  });
+export const resolveProductsInputSchema = retrievalCriteriaSchema.extend({
+  categorySlug: z.enum(CATEGORY_SLUGS).nullable().optional(),
+  sort: z.enum(SORT_OPTIONS).nullable().optional(),
+});
 
 export const resolveProductsOutputSchema = z.object({
   products: productCardSchema.array(),

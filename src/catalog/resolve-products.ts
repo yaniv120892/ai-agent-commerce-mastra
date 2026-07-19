@@ -61,12 +61,31 @@ function selectMatching(
   criteria: RetrievalCriteria,
   catalog: NormalizedProduct[],
 ): ScoredProduct[] {
-  const searchTerms = normalizeSearchTerms(criteria.searchTerms);
-  const eligible = catalog.filter((product) => passesHardFilters(product, criteria));
+  const bounded = withoutMeaninglessUpperBounds(criteria);
+  const searchTerms = normalizeSearchTerms(bounded.searchTerms);
+  const eligible = catalog.filter((product) => passesHardFilters(product, bounded));
   const scored = scoreProducts(eligible, searchTerms);
   const sorted = sortScoredProducts(scored, criteria.sort ?? 'relevance');
 
   return sorted.filter((entry) => !isExcluded(entry.product, criteria));
+}
+
+// A zero upper bound is never a real shopper constraint — nobody asks for products costing
+// at most nothing, or shipping in at most zero days — but a model repairing a rejected call
+// reaches for zero as a neutral placeholder, and left alone it eliminates the whole catalog.
+// Only the upper bounds are treated this way: a zero *lower* bound (minPrice, minRating,
+// minReturnDays) is already a harmless no-op, and blanket-stripping every zero would throw
+// away real filters alongside the placeholders.
+function withoutMeaninglessUpperBounds(criteria: RetrievalCriteria): RetrievalCriteria {
+  const bounded = { ...criteria };
+  if (bounded.maxPrice === 0) {
+    delete bounded.maxPrice;
+  }
+  if (bounded.maxShippingDays === 0) {
+    delete bounded.maxShippingDays;
+  }
+
+  return bounded;
 }
 
 function countMatchedWithoutCategoryFilter(

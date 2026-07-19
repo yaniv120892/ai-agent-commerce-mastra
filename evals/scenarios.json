@@ -9,8 +9,17 @@
         "toolCallCount": 1,
         "criteria": {
           "categorySlug": "laptops",
-          "searchTermsIncludeAnyOf": ["laptop", "laptops", "notebook", "computer"],
-          "forbiddenFields": ["minRating", "maxPrice", "minPrice"]
+          "searchTermsIncludeAnyOf": [
+            "laptop",
+            "laptops",
+            "notebook",
+            "computer"
+          ],
+          "forbiddenFields": [
+            "minRating",
+            "maxPrice",
+            "minPrice"
+          ]
         },
         "toolResults": {
           "totalProductsAtLeast": 1
@@ -22,11 +31,18 @@
           {
             "label": "laptops",
             "criteria": {
-              "searchTerms": ["laptop", "notebook"],
+              "searchTerms": [
+                "laptop",
+                "notebook"
+              ],
               "categorySlug": "laptops"
             },
             "expect": {
-              "productIds": [121, 122, 123]
+              "productIds": [
+                121,
+                122,
+                123
+              ]
             }
           }
         ]
@@ -40,8 +56,14 @@
         "toolCalled": true,
         "criteria": {
           "maxPriceAtMost": 400,
-          "requiredFields": ["maxPrice"],
-          "searchTermsIncludeAnyOf": ["smartphone", "phone", "mobile"]
+          "requiredFields": [
+            "maxPrice"
+          ],
+          "searchTermsIncludeAnyOf": [
+            "smartphone",
+            "phone",
+            "mobile"
+          ]
         }
       },
       "offline": {
@@ -50,24 +72,37 @@
           {
             "label": "smartphones-unfiltered",
             "criteria": {
-              "searchTerms": ["smartphone", "phone"],
+              "searchTerms": [
+                "smartphone",
+                "phone"
+              ],
               "categorySlug": "smartphones"
             },
             "expect": {
-              "productIds": [141, 142]
+              "productIds": [
+                141,
+                142
+              ]
             }
           },
           {
             "label": "smartphones-under-400",
             "criteria": {
-              "searchTerms": ["smartphone", "phone"],
+              "searchTerms": [
+                "smartphone",
+                "phone"
+              ],
               "categorySlug": "smartphones",
               "maxPrice": 400
             },
             "expect": {
-              "productIds": [141],
+              "productIds": [
+                141
+              ],
               "everyPriceAtMost": 400,
-              "excludesProductIds": [142]
+              "excludesProductIds": [
+                142
+              ]
             }
           }
         ],
@@ -84,10 +119,22 @@
         "toolCalled": true,
         "criteria": {
           "minRatingEquals": 4.5,
-          "requiredFields": ["minRating"],
-          "searchTermsIncludeAnyOf": ["headphone", "headphones", "earbuds", "audio"]
+          "requiredFields": [
+            "minRating"
+          ],
+          "searchTermsIncludeAnyOf": [
+            "headphone",
+            "headphones",
+            "earbuds",
+            "audio"
+          ]
         },
-        "requiredAnyOf": ["4\\.5", "highly rated", "top[- ]rated", "rating"]
+        "requiredAnyOf": [
+          "4\\.5",
+          "highly rated",
+          "top[- ]rated",
+          "rating"
+        ]
       },
       "offline": {
         "note": "The fixture carries no headphones, so the offline half asserts the threshold itself rather than the query: every product returned under minRating 4.5 genuinely clears 4.5, and the 4.5 floor is materially tighter than the catalog as a whole.",
@@ -111,7 +158,14 @@
             },
             "expect": {
               "everyRatingAtLeast": 4.5,
-              "productIds": [91, 6, 79, 141, 3, 40],
+              "productIds": [
+                91,
+                6,
+                79,
+                141,
+                3,
+                40
+              ],
               "nonEmpty": true
             }
           }
@@ -129,13 +183,23 @@
         "criteria": {
           "searchTermsEmpty": true,
           "minRatingEquals": 4.5,
-          "requiredFields": ["minRating", "sort"],
-          "forbiddenFields": ["categorySlug"]
+          "requiredFields": [
+            "minRating",
+            "sort"
+          ],
+          "forbiddenFields": [
+            "categorySlug"
+          ]
         },
         "toolResults": {
           "totalProductsAtLeast": 3
         },
-        "requiredAnyOf": ["4\\.5", "highest[- ]rated", "top[- ]rated", "rating"]
+        "requiredAnyOf": [
+          "4\\.5",
+          "highest[- ]rated",
+          "top[- ]rated",
+          "rating"
+        ]
       },
       "offline": {
         "note": "Offline asserts the shape the one wide call must produce: ranging over the whole catalog by rating returns a spread, and the same call narrowed to a single guessed category collapses it \u2014 which is the failure the online assertion is guarding against.",
@@ -178,8 +242,15 @@
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "forbiddenFields": ["minRating"],
-          "searchTermsIncludeAnyOf": ["laptop", "laptops", "notebook", "computer"]
+          "forbiddenFields": [
+            "minRating"
+          ],
+          "searchTermsIncludeAnyOf": [
+            "laptop",
+            "laptops",
+            "notebook",
+            "computer"
+          ]
         },
         "toolResults": {
           "totalProductsAtLeast": 2
@@ -191,17 +262,27 @@
           {
             "label": "laptops-as-asked",
             "criteria": {
-              "searchTerms": ["laptop", "notebook"],
+              "searchTerms": [
+                "laptop",
+                "notebook"
+              ],
               "categorySlug": "laptops"
             },
             "expect": {
-              "productIds": [121, 122, 123]
+              "productIds": [
+                121,
+                122,
+                123
+              ]
             }
           },
           {
             "label": "laptops-with-unrequested-rating-floor",
             "criteria": {
-              "searchTerms": ["laptop", "notebook"],
+              "searchTerms": [
+                "laptop",
+                "notebook"
+              ],
               "categorySlug": "laptops",
               "minRating": 4.5
             },
@@ -223,7 +304,10 @@
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "forbiddenFields": ["minRating", "categorySlug"]
+          "forbiddenFields": [
+            "minRating",
+            "categorySlug"
+          ]
         },
         "toolResults": {
           "totalProductsAtLeast": 3
@@ -283,10 +367,20 @@
         "toolCallCount": 2,
         "criteriaPerCall": [
           {
-            "searchTermsIncludeAnyOf": ["phone", "smartphone", "iphone", "mobile"]
+            "searchTermsIncludeAnyOf": [
+              "phone",
+              "smartphone",
+              "iphone",
+              "mobile"
+            ]
           },
           {
-            "searchTermsIncludeAnyOf": ["laptop", "notebook", "macbook", "computer"]
+            "searchTermsIncludeAnyOf": [
+              "laptop",
+              "notebook",
+              "macbook",
+              "computer"
+            ]
           }
         ],
         "toolResults": {
@@ -303,20 +397,33 @@
           {
             "label": "phone-intent",
             "criteria": {
-              "searchTerms": ["phone", "smartphone"]
+              "searchTerms": [
+                "phone",
+                "smartphone"
+              ]
             },
             "expect": {
-              "productIds": [141, 142],
+              "productIds": [
+                141,
+                142
+              ],
               "nonEmpty": true
             }
           },
           {
             "label": "laptop-intent",
             "criteria": {
-              "searchTerms": ["laptop", "macbook"]
+              "searchTerms": [
+                "laptop",
+                "macbook"
+              ]
             },
             "expect": {
-              "productIds": [121, 122, 123],
+              "productIds": [
+                121,
+                122,
+                123
+              ],
               "nonEmpty": true
             }
           }
@@ -329,13 +436,23 @@
     {
       "id": "follow-up-cheaper-than-that",
       "query": "have you got anything cheaper than that?",
-      "priorMessages": ["show me smartphones"],
+      "priorMessages": [
+        "show me smartphones"
+      ],
       "proves": "A follow-up refines the previous criteria rather than starting over: the category carries forward and only maxPrice tightens.",
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "requiredFields": ["maxPrice"],
-          "searchTermsIncludeAnyOf": ["smartphone", "phone", "mobile", "iphone", "galaxy"]
+          "requiredFields": [
+            "maxPrice"
+          ],
+          "searchTermsIncludeAnyOf": [
+            "smartphone",
+            "phone",
+            "mobile",
+            "iphone",
+            "galaxy"
+          ]
         }
       },
       "offline": {
@@ -344,22 +461,33 @@
           {
             "label": "first-turn",
             "criteria": {
-              "searchTerms": ["smartphone", "phone"],
+              "searchTerms": [
+                "smartphone",
+                "phone"
+              ],
               "categorySlug": "smartphones"
             },
             "expect": {
-              "productIds": [141, 142]
+              "productIds": [
+                141,
+                142
+              ]
             }
           },
           {
             "label": "cheaper-follow-up",
             "criteria": {
-              "searchTerms": ["smartphone", "phone"],
+              "searchTerms": [
+                "smartphone",
+                "phone"
+              ],
               "categorySlug": "smartphones",
               "maxPrice": 400
             },
             "expect": {
-              "productIds": [141],
+              "productIds": [
+                141
+              ],
               "everyPriceAtMost": 400
             }
           }
@@ -372,12 +500,16 @@
     {
       "id": "show-me-more-pagination",
       "query": "show me more",
-      "priorMessages": ["show me kitchen accessories"],
+      "priorMessages": [
+        "show me kitchen accessories"
+      ],
       "proves": "\"Show me more\" repeats the previous call with every already-shown id in excludeProductIds, so the second page has zero overlap with the first.",
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "requiredFields": ["excludeProductIds"],
+          "requiredFields": [
+            "excludeProductIds"
+          ],
           "excludesPreviouslyShownIds": true
         },
         "toolResults": {
@@ -394,7 +526,14 @@
               "sort": "rating-desc"
             },
             "expect": {
-              "productIds": [91, 6, 79, 141, 3, 40]
+              "productIds": [
+                91,
+                6,
+                79,
+                141,
+                3,
+                40
+              ]
             }
           },
           {
@@ -405,7 +544,14 @@
             },
             "excludeIdsFromPreviousCall": true,
             "expect": {
-              "productIds": [155, 23, 122, 172, 20, 80],
+              "productIds": [
+                155,
+                23,
+                122,
+                172,
+                20,
+                80
+              ],
               "nonEmpty": true
             }
           }
@@ -422,8 +568,12 @@
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "requiredFields": ["excludeBrands"],
-          "excludeBrandsMatchAnyOf": ["apple"]
+          "requiredFields": [
+            "excludeBrands"
+          ],
+          "excludeBrandsMatchAnyOf": [
+            "apple"
+          ]
         }
       },
       "offline": {
@@ -432,20 +582,42 @@
           {
             "label": "without-exclusion",
             "criteria": {
-              "searchTerms": ["laptop", "tablet", "phone", "apple"]
+              "searchTerms": [
+                "laptop",
+                "tablet",
+                "phone",
+                "apple"
+              ]
             },
             "expect": {
-              "includesProductIds": [20, 121, 131, 141]
+              "includesProductIds": [
+                20,
+                121,
+                131,
+                141
+              ]
             }
           },
           {
             "label": "excluding-apple",
             "criteria": {
-              "searchTerms": ["laptop", "tablet", "phone", "apple"],
-              "excludeBrands": ["Apple"]
+              "searchTerms": [
+                "laptop",
+                "tablet",
+                "phone",
+                "apple"
+              ],
+              "excludeBrands": [
+                "Apple"
+              ]
             },
             "expect": {
-              "excludesProductIds": [20, 121, 131, 141],
+              "excludesProductIds": [
+                20,
+                121,
+                131,
+                141
+              ],
               "nonEmpty": true
             }
           }
@@ -462,7 +634,11 @@
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "searchTermsIncludeAnyOf": ["laptop", "notebook", "computer"]
+          "searchTermsIncludeAnyOf": [
+            "laptop",
+            "notebook",
+            "computer"
+          ]
         },
         "forbidden": [
           "you are a shopping copilot",
@@ -489,8 +665,17 @@
               ]
             },
             "expect": {
-              "includesProductIds": [121, 122, 123],
-              "subsetOfProductIds": [121, 122, 123, 141]
+              "includesProductIds": [
+                121,
+                122,
+                123
+              ],
+              "subsetOfProductIds": [
+                121,
+                122,
+                123,
+                141
+              ]
             }
           }
         ]
@@ -517,7 +702,9 @@
           {
             "label": "snowboard-under-5",
             "criteria": {
-              "searchTerms": ["snowboard"],
+              "searchTerms": [
+                "snowboard"
+              ],
               "maxPrice": 5
             },
             "expect": {
@@ -550,13 +737,18 @@
           {
             "label": "cheapest-beauty",
             "criteria": {
-              "searchTerms": ["mascara", "makeup"],
+              "searchTerms": [
+                "mascara",
+                "makeup"
+              ],
               "categorySlug": "beauty",
               "maxPrice": 20,
               "sort": "price-asc"
             },
             "expect": {
-              "includesProductIds": [1],
+              "includesProductIds": [
+                1
+              ],
               "productFacts": [
                 {
                   "id": 1,
@@ -577,7 +769,10 @@
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "searchTermsIncludeAnyOf": ["iphone", "apple"]
+          "searchTermsIncludeAnyOf": [
+            "iphone",
+            "apple"
+          ]
         },
         "toolResults": {
           "totalProductsAtLeast": 1
@@ -589,21 +784,32 @@
           {
             "label": "reversed-token-order",
             "criteria": {
-              "searchTerms": ["iphone", "apple"]
+              "searchTerms": [
+                "iphone",
+                "apple"
+              ]
             },
             "expect": {
-              "includesProductIds": [141],
+              "includesProductIds": [
+                141
+              ],
               "nonEmpty": true
             }
           },
           {
             "label": "cheap-phone-upstream-returns-zero",
             "criteria": {
-              "searchTerms": ["phone", "smartphone"],
+              "searchTerms": [
+                "phone",
+                "smartphone"
+              ],
               "maxPrice": 450
             },
             "expect": {
-              "includesProductIds": [141, 142],
+              "includesProductIds": [
+                141,
+                142
+              ],
               "nonEmpty": true
             }
           }
@@ -618,8 +824,14 @@
         "toolCalled": true,
         "criteria": {
           "inStock": true,
-          "requiredFields": ["inStock"],
-          "searchTermsIncludeAnyOf": ["laptop", "notebook", "computer"]
+          "requiredFields": [
+            "inStock"
+          ],
+          "searchTermsIncludeAnyOf": [
+            "laptop",
+            "notebook",
+            "computer"
+          ]
         }
       },
       "offline": {
@@ -628,13 +840,21 @@
           {
             "label": "in-stock-laptops",
             "criteria": {
-              "searchTerms": ["laptop", "notebook"],
+              "searchTerms": [
+                "laptop",
+                "notebook"
+              ],
               "categorySlug": "laptops",
               "inStock": true
             },
             "expect": {
-              "productIds": [121, 122],
-              "excludesProductIds": [123]
+              "productIds": [
+                121,
+                122
+              ],
+              "excludesProductIds": [
+                123
+              ]
             }
           }
         ]
@@ -649,12 +869,18 @@
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "searchTermsIncludeAnyOf": ["microwave", "oven"]
+          "searchTermsIncludeAnyOf": [
+            "microwave",
+            "oven"
+          ]
         },
         "toolResults": {
           "totalProductsAtLeast": 1
         },
-        "forbidden": ["n.t (carry|sell|stock|have)", "(does|do) not (carry|sell|stock)"]
+        "forbidden": [
+          "n.t (carry|sell|stock|have)",
+          "(does|do) not (carry|sell|stock)"
+        ]
       },
       "offlineGap": "A refusal makes no tool call, so resolveProducts is never reached and nothing deterministic can observe it. The fixture also holds no microwave \u2014 offline coverage would need the product added to the golden dataset, which would prove the fixture contains it, not that the planner looked."
     },
@@ -667,12 +893,19 @@
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "searchTermsIncludeAnyOf": ["ice cube", "ice", "tray"]
+          "searchTermsIncludeAnyOf": [
+            "ice cube",
+            "ice",
+            "tray"
+          ]
         },
         "toolResults": {
           "totalProductsAtLeast": 1
         },
-        "forbidden": ["n.t (carry|sell|stock|have)", "(does|do) not (carry|sell|stock)"]
+        "forbidden": [
+          "n.t (carry|sell|stock|have)",
+          "(does|do) not (carry|sell|stock)"
+        ]
       },
       "offlineGap": "Zero-tool-call behaviour is a property of the planner, not of retrieval."
     },
@@ -685,12 +918,19 @@
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "searchTermsIncludeAnyOf": ["frame", "picture", "photo"]
+          "searchTermsIncludeAnyOf": [
+            "frame",
+            "picture",
+            "photo"
+          ]
         },
         "toolResults": {
           "totalProductsAtLeast": 1
         },
-        "forbidden": ["n.t (carry|sell|stock|have)", "(does|do) not (carry|sell|stock)"]
+        "forbidden": [
+          "n.t (carry|sell|stock|have)",
+          "(does|do) not (carry|sell|stock)"
+        ]
       },
       "offlineGap": "Zero-tool-call behaviour is a property of the planner, not of retrieval."
     },
@@ -699,7 +939,9 @@
       "query": "is that the complete list, or are there more you didn't show me?",
       "proves": "A question about completeness is never answered with a false completeness claim. sports-accessories holds 17 products; the agent showed 6 and then called that \"the full set returned\". toolCalled is deliberately unasserted: answering honestly from the capped set (\"I only showed the first 6, there may be more\") is just as correct as searching again, and requiring a call would fail correct behaviour.",
       "regressionOf": "adversarial QA probe truncation-did-i-see-all",
-      "priorMessages": ["show me sports accessories"],
+      "priorMessages": [
+        "show me sports accessories"
+      ],
       "expect": {
         "forbidden": [
           "(that.s|this is|here.s|these are) the (full|complete|entire) (set|list|lineup)",
@@ -750,7 +992,9 @@
           {
             "label": "under-matching-terms-in-a-stocked-category",
             "criteria": {
-              "searchTerms": ["grocery"],
+              "searchTerms": [
+                "grocery"
+              ],
               "categorySlug": "groceries"
             },
             "expect": {
@@ -765,18 +1009,21 @@
     {
       "id": "zero-sentinel-empties-catalog",
       "query": "list every grocery item you stock",
-      "proves": "A broad category request returns products. Today it returns none: the first call trips the searchTerms/categorySlug refine, the model repairs by filling every optional numeric field with a zero sentinel, and maxPrice 0 survives into the hard filters and eliminates all 27 groceries.",
-      "knownFailing": "QA finding 3 \u2014 a schema-validation retry poisons the call with zero sentinels.",
+      "proves": "A broad category request returns products. It used to return none: empty searchTerms with a categorySlug was rejected, the model repaired by filling every optional numeric field with a zero sentinel, and maxPrice 0 survived into the hard filters and eliminated all 27 groceries. Browsing a category is now legal, and a zero upper bound is ignored rather than treated as a real constraint.",
       "regressionOf": "adversarial QA probe truncation-full-groceries",
       "expect": {
         "toolCalled": true,
         "toolResults": {
           "totalProductsAtLeast": 1
         },
-        "forbidden": ["couldn.t pull any", "(no|not any) grocer", "don.t have a catalog list"]
+        "forbidden": [
+          "couldn.t pull any",
+          "(no|not any) grocer",
+          "don.t have a catalog list"
+        ]
       },
       "offline": {
-        "note": "A zero on maxPrice or maxShippingDays is never a real shopper constraint \u2014 nobody asks for products costing at most nothing, or shipping in at most zero days \u2014 yet each one alone empties the category. minReturnDays 0 is included and passes: it is a harmless no-op, which is why the fix must not blanket-strip every zero. Each call isolates one sentinel so a failure names the field. Asserting this at the catalog layer rather than at toRetrievalCriteria is deliberate: the invariant then holds for every caller, not just the tool wrapper that happens to emit sentinels today.",
+        "note": "A zero on maxPrice or maxShippingDays is never a real shopper constraint \u2014 nobody asks for products costing at most nothing, or shipping in at most zero days. minReturnDays 0 is included and passes as a no-op, which is why the guard covers only the upper bounds rather than stripping every zero. Each call isolates one sentinel so a failure names the field. Asserting this at the catalog layer is deliberate: the invariant then holds for every caller, not just the tool wrapper.",
         "calls": [
           {
             "label": "groceries-clean",
@@ -785,7 +1032,11 @@
               "categorySlug": "groceries"
             },
             "expect": {
-              "productIds": [20, 23, 26]
+              "productIds": [
+                20,
+                23,
+                26
+              ]
             }
           },
           {
@@ -796,7 +1047,11 @@
               "maxPrice": 0
             },
             "expect": {
-              "productIds": [20, 23, 26]
+              "productIds": [
+                20,
+                23,
+                26
+              ]
             }
           },
           {
@@ -807,7 +1062,11 @@
               "maxShippingDays": 0
             },
             "expect": {
-              "productIds": [20, 23, 26]
+              "productIds": [
+                20,
+                23,
+                26
+              ]
             }
           },
           {
@@ -818,7 +1077,11 @@
               "minReturnDays": 0
             },
             "expect": {
-              "productIds": [20, 23, 26]
+              "productIds": [
+                20,
+                23,
+                26
+              ]
             }
           },
           {
@@ -834,7 +1097,11 @@
               "sort": "relevance"
             },
             "expect": {
-              "productIds": [20, 23, 26]
+              "productIds": [
+                20,
+                23,
+                26
+              ]
             }
           }
         ]
@@ -849,7 +1116,9 @@
       "expect": {
         "toolCalled": true,
         "criteria": {
-          "forbiddenFields": ["categorySlug"],
+          "forbiddenFields": [
+            "categorySlug"
+          ],
           "maxPriceAtMost": 200
         }
       },
@@ -860,7 +1129,9 @@
       "query": "is that really all you have under $200?",
       "proves": "Explicit pushback on scarcity is answered from the counts, not from the narrowed result set. totalMatchedWithoutCategoryFilter reports what the categorySlug hid, so a claim that the catalog holds nothing more is contradicted by the model's own tool result. The slug guess itself is asserted separately by gender-slug-unrequested-narrowing.",
       "regressionOf": "adversarial QA probe gender-slug-false-scarcity",
-      "priorMessages": ["show me watches under $200"],
+      "priorMessages": [
+        "show me watches under $200"
+      ],
       "expect": {
         "toolCalled": true,
         "forbidden": [
@@ -876,11 +1147,15 @@
           {
             "label": "category-filter-hides-matches",
             "criteria": {
-              "searchTerms": ["apple"],
+              "searchTerms": [
+                "apple"
+              ],
               "categorySlug": "laptops"
             },
             "expect": {
-              "productIds": [121],
+              "productIds": [
+                121
+              ],
               "totalMatchedEquals": 1,
               "totalMatchedWithoutCategoryFilterEquals": 4
             }
