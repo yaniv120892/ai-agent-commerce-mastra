@@ -116,16 +116,17 @@ silently, and only the **online** runner can see any of them.
 
 ## Results of the live run
 
-**Current status: 22 of 24 online scenarios pass**, 28 model calls, estimated spend
-**$0.059**. Offline is **37 passing / 3 failing**, all three inside
-`zero-sentinel-empties-catalog`. The two online failures are `zero-sentinel-empties-catalog`
-(finding 3) and `gendered-slug-unrequested-narrowing` (the slug half of finding 4).
+**Current status: 20 of 24 online scenarios pass**, 28 model calls, estimated spend
+**$0.055**. Offline is **37 passing / 3 failing**, all three inside
+`zero-sentinel-empties-catalog`. Every failure is in the `knownFailing` set: findings 1 and 3,
+plus the slug half of finding 4. Trimming the counts section cut input tokens from 201k to
+188k over the same 28 calls (−7%) with no change in outcomes.
 
-Read that 22 with care: the three `false-decline-*` scenarios are **unfixed** and happened to
-pass in this particular run. Finding 1 is intermittent by nature — 3 of 8 stocked items
+Read the count with care: the three `false-decline-*` scenarios are **unfixed**, and how many
+of them fail varies run to run. Finding 1 is intermittent by nature — 3 of 8 stocked items
 probed were falsely declined, driven by item-specific priors rather than sentence shape — so
-across the four runs recorded during this work they failed variously two, two, three and zero
-at a time. A green run does not mean the defect is gone; that is exactly why they keep their
+across the runs recorded during this work they failed variously zero, two, two and three at a
+time. A green run does not mean the defect is gone; that is exactly why they keep their
 `knownFailing` marker until the prompt rule lands.
 
 > **One flake, not caused by the counts.** `follow-up-cheaper-than-that` passed three of five
@@ -143,19 +144,32 @@ set` — the model narrows with `sort: price-asc` plus `excludeProductIds` inste
 
 ### The ablation for "How many there are"
 
-The counts are data; the section tells the model to read them. One live run each, with the
-section cut:
+The counts are data; the section tells the model to read them. Three runs per variant, over
+the three scenarios the counts affect:
 
-| Scenario                              | Without the section | With it |
-| ------------------------------------- | ------------------- | ------- |
-| `truncation-invented-inventory-count` | **failed**          | passed  |
-| `gendered-slug-false-scarcity`        | passed              | passed  |
+| Variant                       | Size    | `truncation-completeness-follow-up` | `truncation-invented-inventory-count` | `gendered-slug-false-scarcity` |
+| ----------------------------- | ------- | ----------------------------------- | ------------------------------------- | ------------------------------ |
+| Full section as first written | 1045 ch | 3/3                                 | 3/3                                   | 3/3                            |
+| **Trimmed (kept)**            | 361 ch  | 3/3                                 | **3/3**                               | 3/3                            |
+| Cut entirely                  | 0       | 3/3                                 | **1/3**                               | 3/3                            |
 
-So the section earns its place, but only half of it does the work. A tool result showing
-`totalMatched: 1` next to `totalMatchedWithoutCategoryFilter: 4` is self-evident enough that
-the model stops making the false scarcity claim unprompted. Counting stock is not
-self-evident: without being told, the model still reports the size of its capped result set
-as the inventory. Structure fixed one; prose was needed for the other.
+Two thirds of what was first written was dead weight, and the pattern in which parts died is
+the interesting result.
+
+**Data that contains a visible contradiction needs no prose.** Completeness and false scarcity
+both hold 3/3 with _no section at all_. A tool result showing `totalMatched: 1` beside
+`totalMatchedWithoutCategoryFilter: 4`, or `17` beside 6 cards, is self-evident — the model
+acts on it unaided, and the paragraphs explaining those two were deleted.
+
+**Data that needs an interpretive rule does need prose.** Nothing in the result marks _which_
+number answers "how many do you carry", so without the section the model still reports its
+capped result set as the inventory — 1 of 3 runs. Note the failure is probabilistic, not
+deterministic; the single-run ablation that first justified this section happened to catch it
+and reported more confidence than one run can support.
+
+The general rule this suggests: **prefer making the right answer structurally visible over
+instructing the model to find it.** Reach for prose only where the data cannot speak for
+itself, and measure which of those it actually is rather than assuming.
 
 The history below is kept deliberately — the two failures this suite caught, and how one of
 them was diagnosed, are the point of having built it.
@@ -225,7 +239,7 @@ expectation key; `searchTermsIncludeAnyOf` could only assert inclusion, never em
 | Five `categorySlug` paragraphs → one              | **16/16 — removed.** The refine enforces the rule the prose was pleading for. |
 | Call mechanics duplicated in the tool description | **16/16 — removed.** Input tokens fell 140k → 109k per run (−22%).            |
 | §"Superlatives about the whole catalog"           | **Regressed twice — put back.**                                               |
-| §"How many there are" (added with the counts)     | **Regressed the count scenario — kept.** See below.                           |
+| §"How many there are" (added with the counts)     | **Cut to a third of its length — kept at 361 chars.** See below.              |
 
 The last row is the point. Without that section the model answers "your highest rated
 products" with `searchTerms: ["product"]` and no rating floor — the fan-out failure,
