@@ -4,7 +4,7 @@ Twenty-six scenarios in one golden dataset (`scenarios.json`), graded by two run
 answer two different questions.
 
 > [!IMPORTANT]
-> **Six scenarios are expected to fail.** They encode defects found by adversarial QA and
+> **Five scenarios are expected to fail.** They encode defects found by adversarial QA and
 > diagnosed but not yet fixed, and they carry a `knownFailing` field that both runners print
 > at the end of a run. A red eval suite is the current correct state. See
 > [Known-failing scenarios](#known-failing-scenarios) before touching them — the one thing
@@ -97,7 +97,7 @@ bounded to 6 agent steps so one runaway tool loop cannot blow the budget between
 | `false-decline-stocked-picture-frame`    | **known failing** — same, third item                      | no      | yes    |
 | `truncation-completeness-follow-up`      | `totalMatched` — a capped list is reported as partial     | yes     | yes    |
 | `truncation-invented-inventory-count`    | `totalInCategory` — stock counted, not cards              | yes     | yes    |
-| `zero-sentinel-empties-catalog`          | **known failing** — `maxPrice: 0` empties the catalog     | yes     | yes    |
+| `zero-sentinel-empties-catalog`          | category browsing works; zero upper bounds ignored        | yes     | yes    |
 | `gendered-slug-unrequested-narrowing`    | ambiguous product type omits the slug instead of guessing | no      | yes    |
 | `gendered-slug-false-scarcity`           | `totalMatchedWithoutCategoryFilter` — no false scarcity   | partial | yes    |
 | `budget-survives-window-eviction`        | **known failing** — budget dropped once out of window     | no      | yes    |
@@ -118,17 +118,14 @@ silently, and only the **online** runner can see any of them.
 
 ## Results of the live run
 
-**Current status: 20 of the 24 scenarios that existed at the time pass**, 28 model calls,
-estimated spend **$0.048**. Offline is **40 of 40** — `zero-sentinel-empties-catalog` is fixed
-by this change and now passes deterministically. The two eviction scenarios were added
-afterwards and run separately; both failed, and the whole suite has not been re-run end to end
-since, so treat the headline as 20 of 24 plus two known failures rather than a fresh 22 of 26.
-They are also the most expensive scenarios in the set — thirteen turns each against one or two
-for everything else — so budget for the spend cap to bind sooner once they run inline.
+**Current status: 21 of 26 online scenarios pass**, 54 model calls, estimated spend
+**$0.079**. Offline is **40 of 40**. This is a full end-to-end run including the two eviction
+scenarios, which earlier statuses had to exclude. Every failure is in the `knownFailing` set:
+the three `false-decline-*` scenarios and the recall-window pair.
 
-Making category browsing legal also cut input tokens from 188k to 162k over the same 28 calls
-(−14%), because the grocery query no longer spends a rejected call plus two repair attempts
-before giving up.
+The eviction pair is by far the most expensive in the set — thirteen turns each against one or
+two for everything else, roughly half the run's model calls between them — so the default
+$0.50 cap now binds much sooner than it used to.
 
 Read the count with care: the three `false-decline-*` scenarios are **unfixed**, and how many
 of them fail varies run to run. Finding 1 is intermittent by nature — 3 of 8 stocked items
@@ -277,7 +274,7 @@ covered: `upstream-zero-reversed-tokens` asserts the first two directly,
 
 ## Known-failing scenarios
 
-Six scenarios run **red on purpose**: four encode defects found by an adversarial QA pass
+Five scenarios run **red on purpose**: three encode defects found by an adversarial QA pass
 (32 probes against the live catalog) and confirmed against `https://dummyjson.com/products/...`
 directly, and two encode the recall-window limit described in
 [State that outlives the recall window](#state-that-outlives-the-recall-window). They are
@@ -285,9 +282,11 @@ asserted exactly like every other scenario. Each carries a
 `knownFailing` string, which both runners print at the end of a run so an intentional red is
 never mistakable for rot.
 
-Two of the original seven — plus half of a third — were fixed by the retrieval counts; see
-[What the retrieval counts fixed](#what-the-retrieval-counts-fixed). A fourth,
-`zero-sentinel-empties-catalog`, was fixed by making category browsing legal.
+Four of the original seven have since been fixed: two plus half of a third by the retrieval
+counts (see [What the retrieval counts fixed](#what-the-retrieval-counts-fixed)),
+`zero-sentinel-empties-catalog` by making category browsing legal, and
+`gendered-slug-unrequested-narrowing` by the ambiguous-slug rule. What remains is finding 1
+and the recall-window pair — one defect of the agent's judgement, one of its memory.
 
 **The rule: clear one by fixing the agent, then delete its `knownFailing` field. Never by
 weakening the assertion.** An eval tuned until it agrees with current behaviour tests
@@ -298,7 +297,6 @@ nothing — the same principle that kept `ambiguous-cheap-and-cool` failing thro
 | `false-decline-stocked-microwave`        | "this store doesn't carry microwaves" — zero tool calls; id 66 is $89.99 | `instructions.ts`            |
 | `false-decline-stocked-ice-cube-tray`    | same, id 62 at $5.99                                                     | `instructions.ts`            |
 | `false-decline-stocked-picture-frame`    | same, id 44 at $29.99                                                    | `instructions.ts`            |
-| `gendered-slug-unrequested-narrowing`    | "watches under $200" narrowed to `mens-watches` unprompted               | `instructions.ts`            |
 | `budget-survives-window-eviction`        | a $50 budget stated 12 turns back no longer reaches the model            | `memory.ts` — working memory |
 | `pagination-ids-survive-window-eviction` | "show me more" re-serves page one; the shown ids were evicted            | `memory.ts` — working memory |
 
