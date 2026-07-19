@@ -1,11 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixtureCatalog, fixtureCatalogWithUnknownValues } from './__fixtures__/catalog';
 import {
+  CATALOG_REQUEST_TIMEOUT_MS,
   CATALOG_URL,
   CatalogPayloadError,
   CatalogRequestError,
   fetchRawProducts,
 } from './catalog-client';
+
+function timeoutError(): Error {
+  const error = new Error('The operation was aborted due to timeout');
+  error.name = 'TimeoutError';
+  return error;
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -30,6 +37,38 @@ afterEach(() => {
 });
 
 describe('fetchRawProducts', () => {
+  it('carries an abort signal so a stalled upstream cannot hang the turn', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ products: fixtureCatalog }));
+
+    await fetchRawProducts();
+
+    const requestInit = fetchMock.mock.calls[0][1];
+    expect(requestInit?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('treats a timeout as retryable and names the elapsed budget', async () => {
+    fetchMock.mockRejectedValueOnce(timeoutError());
+    fetchMock.mockResolvedValueOnce(jsonResponse({ products: fixtureCatalog }));
+
+    const result = await fetchRawProducts();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.products).toHaveLength(fixtureCatalog.length);
+  });
+
+  it('surfaces a timeout that outlives the retry, naming the budget rather than a generic failure', async () => {
+    fetchMock.mockRejectedValue(timeoutError());
+
+    const failure = await fetchRawProducts().catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(CatalogRequestError);
+    if (!(failure instanceof CatalogRequestError)) {
+      throw new Error('expected a CatalogRequestError');
+    }
+    expect(failure.retryable).toBe(true);
+    expect(failure.message).toContain(`timed out after ${CATALOG_REQUEST_TIMEOUT_MS}ms`);
+  });
+
   it('requests the hardcoded dummyjson catalog url with limit 0 and the selected fields', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ products: fixtureCatalog }));
 
