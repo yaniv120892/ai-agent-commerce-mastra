@@ -886,6 +886,66 @@
           }
         ]
       }
+    },
+    {
+      "id": "budget-survives-window-eviction",
+      "query": "ok, show me what you'd recommend for him",
+      "priorMessages": [
+        "I'm shopping for a gift for my dad and my budget is $50",
+        "do you sell plane tickets?",
+        "what about hotel bookings?",
+        "can I buy a gym membership here?",
+        "do you have concert tickets?",
+        "any software licences?",
+        "do you sell car insurance?",
+        "can I book a haircut?",
+        "do you offer cooking classes?",
+        "any streaming subscriptions?",
+        "do you sell theatre tickets?",
+        "can I hire a plumber through you?"
+      ],
+      "proves": "A budget the shopper stated once still binds the search twelve turns later. The shopper never withdrew it, so a recommendation over $50 contradicts a constraint they consider live.",
+      "knownFailing": "The $50 budget lives only as prose in the recall window. A turn stores two messages, so the 20-message recall window holds ten turns. The constraint here is stated twelve turns before the query that must honour it, which puts it outside the window: measured against the mock model, a sentinel stated on the first turn is still in the prompt after ten turns and gone after eleven. Nothing else persists it, so the model cannot recover it. The turn retrieves without maxPrice and recommends products the shopper cannot afford, with no error anywhere. Fixing this needs the budget held outside the window as working memory, not a larger window.",
+      "expect": {
+        "toolCalled": true,
+        "criteria": {
+          "requiredFields": ["maxPrice"],
+          "maxPriceAtMost": 50
+        }
+      },
+      "offlineGap": "Constraint retention is a property of the memory layer, not of retrieval. resolveProducts is stateless and correctly honours whatever maxPrice it is handed; the failure is that no maxPrice is handed to it at all."
+    },
+    {
+      "id": "pagination-ids-survive-window-eviction",
+      "query": "show me more kitchen accessories",
+      "priorMessages": [
+        "show me kitchen accessories",
+        "do you sell plane tickets?",
+        "what about hotel bookings?",
+        "can I buy a gym membership here?",
+        "do you have concert tickets?",
+        "any software licences?",
+        "do you sell car insurance?",
+        "can I book a haircut?",
+        "do you offer cooking classes?",
+        "any streaming subscriptions?",
+        "do you sell theatre tickets?",
+        "can I hire a plumber through you?"
+      ],
+      "proves": "\"Show me more\" still excludes every product already shown when the turn that showed them has left the recall window. The filler turns retrieve nothing, so the only already-shown ids are the ones now out of reach.",
+      "knownFailing": "The instructions require passing the ids of every product already shown in excludeProductIds, but those ids exist only inside the evicted tool result. A turn stores two messages, so the 20-message recall window holds ten turns. The constraint here is stated twelve turns before the query that must honour it, which puts it outside the window: measured against the mock model, a sentinel stated on the first turn is still in the prompt after ten turns and gone after eleven. Nothing else persists it, so the model cannot recover it. The shopper asks for more and is shown the same page again. This is the clearest case for structured working memory: the id list is exactly the kind of state that must survive independently of the transcript.",
+      "expect": {
+        "toolCalled": true,
+        "criteria": {
+          "categorySlug": "kitchen-accessories",
+          "requiredFields": ["excludeProductIds"],
+          "excludesPreviouslyShownIds": true
+        },
+        "toolResults": {
+          "totalProductsAtLeast": 1
+        }
+      },
+      "offlineGap": "The offline half already proves exclusion works when the ids are supplied (show-me-more-pagination). What cannot be observed deterministically is the planner failing to supply them because the turn that produced them is no longer in the prompt."
     }
   ]
 }

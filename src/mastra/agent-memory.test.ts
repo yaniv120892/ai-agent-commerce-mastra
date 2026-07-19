@@ -325,6 +325,54 @@ describe('bounded history window', () => {
   }, 60_000);
 });
 
+/**
+ * Documents the eviction boundary that the two `*-survives-window-eviction` online
+ * scenarios fail against, deterministically and without spending a token.
+ *
+ * The point of the second assertion is that this is NOT data loss. The constraint is
+ * still in storage and still renders in the UI; it simply stops being handed to the
+ * model. That is why a larger `lastMessages` only moves the cliff rather than removing
+ * it, and why the fix is to hold shopper state outside the transcript.
+ *
+ * When working memory lands, the sentinel should reach the model through that channel
+ * and the first assertion here becomes wrong. Replace it with the positive form then —
+ * do not widen the window to make it pass.
+ */
+describe('constraints stated before the recall window', () => {
+  const TURNS_THAT_FIT_THE_WINDOW = HISTORY_WINDOW_MESSAGES / 2;
+  const SENTINEL = 'my budget is fifty dollars';
+
+  it('stop reaching the model, while remaining in stored history', async () => {
+    const memory = makeMemory();
+    const model = makeModel('resolveProducts', ALL_OPTIONALS_NULL);
+    const agent = makeAgent(memory, model, 'resolveProducts', []);
+
+    await agent.generate(SENTINEL, {
+      memory: { thread: 'eviction-thread', resource: RESOURCE_ID },
+    });
+    for (let turn = 0; turn <= TURNS_THAT_FIT_THE_WINDOW; turn += 1) {
+      await agent.generate(`filler turn ${turn}`, {
+        memory: { thread: 'eviction-thread', resource: RESOURCE_ID },
+      });
+    }
+
+    expect(JSON.stringify(lastPrompt(model))).not.toContain(SENTINEL);
+
+    const { messages } = await memory.recall({
+      threadId: 'eviction-thread',
+      resourceId: RESOURCE_ID,
+    });
+    expect(JSON.stringify(messages)).not.toContain(SENTINEL);
+
+    const { messages: everyStoredMessage } = await memory.recall({
+      threadId: 'eviction-thread',
+      resourceId: RESOURCE_ID,
+      threadConfig: { lastMessages: HISTORY_WINDOW_MESSAGES * 10 },
+    });
+    expect(JSON.stringify(everyStoredMessage)).toContain(SENTINEL);
+  }, 60_000);
+});
+
 describe('history written by an earlier tool set', () => {
   it('never forwards a tool call the agent no longer declares', async () => {
     const memory = makeMemory();
