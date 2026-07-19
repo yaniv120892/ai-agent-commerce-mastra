@@ -283,10 +283,21 @@ function isExcluded(product: NormalizedProduct, criteria: RetrievalCriteria): bo
   const excludedBrands = criteria.excludeBrands ?? [];
   const brand = product.brand?.toLowerCase() ?? '';
   const title = product.title.toLowerCase();
+  const tokens = [...tokenize(brand), ...tokenize(title)];
 
   return excludedBrands.some((excludedBrand) => {
     const needle = excludedBrand.trim().toLowerCase();
     if (needle.length === 0) {
+      return false;
+    }
+    if (tokens.includes(needle)) {
+      return true;
+    }
+    // Substring matching is what makes exclusion work at all, because `brand` is missing on
+    // 92 of 194 products and "no Apple" has to reach "Apple MacBook Pro" through the title.
+    // Below the same floor the scorer uses, it stops being a brand match and starts being a
+    // coincidence: "hp" is inside "whipped", "le" is inside almost everything.
+    if (needle.length < MINIMUM_PARTIAL_MATCH_LENGTH) {
       return false;
     }
 
