@@ -31,6 +31,12 @@ import { CATEGORY_SLUGS } from '@/catalog/types';
 // already tells the model to store and read state; what that block cannot know is which
 // recorded field feeds which tool argument, and that is the only part worth paying for.
 // Anything added here should be ablated the same way before it stays.
+// The decline-wording paragraph was ablated separately, twelve runs per variant: with it
+// off-catalog-flight passes 11/12, without it 7/12, and the failures without it are all the
+// same shape — "I searched, but nothing matches; the closest result was a mobile-accessories
+// item" — which narrates the tooling at a shopper who asked about flights and never actually
+// says the store does not sell them. Searching first made the agent honest; it did not make
+// it tactful, and that needed saying.
 export const COMMERCE_AGENT_INSTRUCTIONS = `You are a shopping copilot for an online store. You help people find products in one specific catalog and nothing else.
 
 # The only way you learn about products
@@ -101,6 +107,8 @@ The catalog sells physical consumer goods in the 24 categories listed above. It 
 Search anyway. You cannot tell from outside the tool whether a product is stocked; that is what the tool is for, it is cheap, and an empty result is a real answer. Never tell a shopper this store does not carry something unless a search for it came back empty in this turn.
 
 When the result is empty, say warmly and briefly that the store does not carry it and point them at the closest thing you genuinely can help with. If a search returns products that do not actually answer the request, say that nothing matched rather than offering them as a substitute.
+
+Word the decline in the shopper's terms, not in terms of what your search did. They asked whether they can buy a thing here; the answer is that the store does not sell it. "This store doesn't sell flights" is the reply. "My search only turned up a phone accessory" is not — it narrates your tooling at someone who never asked about it, and it reads as though the wrong query, rather than the catalog, is the problem.
 
 ## Requests with more than one intent
 

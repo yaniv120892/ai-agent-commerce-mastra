@@ -4,17 +4,17 @@ Twenty-six scenarios in one golden dataset (`scenarios.json`), graded by two run
 answer two different questions.
 
 > [!IMPORTANT]
-> **No scenario carries a `knownFailing` marker any more.** Every defect the adversarial QA
-> pass found has been fixed, and the recall-window pair was the last to go. Both runners still
-> print the marker at the end of a run, so re-introducing one stays visible. See
-> [Known-failing scenarios](#known-failing-scenarios) for the rule that governs adding one —
-> the one thing not to do is relax an assertion to get green.
+> **One scenario carries a `knownFailing` marker.** `follow-up-cheaper-than-that` answers
+> "cheaper than that" with `sort: price-asc` plus `excludeProductIds` and no `maxPrice` on
+> roughly one run in three — which orders the results but never guarantees any of them is
+> cheaper than what was already shown. It is now diagnosed, so it is marked; it spent a long
+> time as an unlabelled flake, and that is what let a second, unrelated failure hide inside it
+> (see [Two failures wearing one name](#two-failures-wearing-one-name)). See
+> [Known-failing scenarios](#known-failing-scenarios) for the rule — the one thing not to do
+> is relax an assertion to get green.
 >
-> A green suite is now the expected state, with one caveat worth knowing before you read a red
-> run as rot: three scenarios are **not perfectly reliable** —
-> `pagination-ids-survive-window-eviction` at roughly 8 runs in 10,
-> `off-catalog-flight` at about 2 in 4 (its regex rejects some correct refusals), and
-> `follow-up-cheaper-than-that`, which predates both. None is marked, deliberately; see
+> One other scenario is **not perfectly reliable**: `pagination-ids-survive-window-eviction`,
+> at roughly 8 runs in 10, deliberately unmarked; see
 > [State that outlives the recall window](#state-that-outlives-the-recall-window).
 
 | Runner                                     | Question it answers                             | Model calls  | Cost   |
@@ -125,12 +125,18 @@ silently, and only the **online** runner can see any of them.
 
 ## Results of the live run
 
-**Current status: 24 of 26 online scenarios pass**, and the only two failures are the
-recall-window pair, which is where the `knownFailing` set now begins and ends. Offline is
-**40 of 40**. The last full end-to-end run measured 21 of 26 at 54 model calls and $0.079;
-the three `false-decline-*` scenarios have since been fixed and were verified 3/3 over three
-consecutive filtered runs (7 scenarios, 7 model calls, $0.013 each), so the headline is that
-run plus those three, not a fresh full sweep.
+**Current status: 25 of 26 online scenarios pass**, 54 model calls, estimated spend
+**$0.170**, on a full end-to-end run. Offline is **40 of 40**. The single failure is
+`pagination-ids-survive-window-eviction`, the ~8-in-10 flake described below.
+`follow-up-cheaper-than-that` passed this run; it is marked `knownFailing` because it fails
+about one run in three, not every run.
+
+**Working memory is not free.** Enabling it cost roughly **39% more input tokens on every
+turn**, measured A/B on three single-turn scenarios that cannot benefit from it at all
+(19,342 → 26,891 input tokens for the same 3 model calls). A full run went from 276k to
+~614k tokens and $0.079 to $0.170. The eviction defect was real and worth fixing, but the
+bill lands on every conversation, including the short ones that never approach the recall
+window — the same objection that ruled out simply raising `lastMessages`.
 
 **Budget for more calls than 54 from now on.** Declining an out-of-catalog request used to
 cost one model call and no tool call; it now costs a search as well. That is the point of the
@@ -148,12 +154,11 @@ time. That is why the fix was measured over three runs in each direction rather 
 single green run never proved anything here. See
 [The ablation for "search before you decline"](#the-ablation-for-search-before-you-decline).
 
-> **One flake, not caused by the counts.** `follow-up-cheaper-than-that` passed three of five
-> runs and failed twice with a real model call behind it (`required field maxPrice was not
-set` — the model narrows with `sort: price-asc` plus `excludeProductIds` instead of a price
-> ceiling). It failed this way before the counts existed. Left unfixed and deliberately
-> **unmarked**: labelling it `knownFailing` would launder an undiagnosed failure into an
-> accepted one.
+> **`follow-up-cheaper-than-that` is now diagnosed and marked.** It had been failing since
+> before the retrieval counts existed and was left unmarked on the principle that labelling an
+> undiagnosed failure launders it into an accepted one. That principle was right, but carrying
+> it unlabelled had a cost — see
+> [Two failures wearing one name](#two-failures-wearing-one-name).
 >
 > Separately, `truncation-completeness-follow-up` twice failed in ~25ms having made no model
 > call, then passed when run alone and again in the final full run. That is the transient-API
@@ -313,17 +318,20 @@ covered: `upstream-zero-reversed-tokens` asserts the first two directly,
 
 ## Known-failing scenarios
 
-**Nothing runs red on purpose any more.** The mechanism stays: a scenario may carry a
-`knownFailing` string, which both runners print at the end of a run so an intentional red is
-never mistakable for rot. There is currently nothing to print.
+**One scenario runs red on purpose.** `follow-up-cheaper-than-that` carries a `knownFailing`
+string describing a diagnosed, unfixed planning miss: about one run in three the model
+narrows "cheaper than that" with `sort: price-asc` and `excludeProductIds` but no `maxPrice`,
+so nothing in the result set is guaranteed to be cheaper than what the shopper already saw.
+Both runners print the marker at the end of a run so an intentional red is never mistakable
+for rot.
 
 All seven of the original QA scenarios have been fixed: two plus half of a third by the
 retrieval counts (see [What the retrieval counts fixed](#what-the-retrieval-counts-fixed)),
 `zero-sentinel-empties-catalog` by making category browsing legal,
 `gendered-slug-unrequested-narrowing` by the ambiguous-slug rule, and the three
 `false-decline-*` scenarios by deleting the rule that told the model not to search. The
-recall-window pair — a defect of the agent's memory rather than its judgement — was the last,
-cleared by working memory; see
+recall-window pair — a defect of the agent's memory rather than its judgement — was cleared by
+working memory; see
 [State that outlives the recall window](#state-that-outlives-the-recall-window).
 
 **The rule: clear one by fixing the agent, then delete its `knownFailing` field. Never by
@@ -509,10 +517,11 @@ suite goes from 24/26 to **25/26**, both eviction scenarios passing. The one fai
 `off-catalog-flight`, which is **not** caused by this work — checked out at `ebdd443` with
 none of these changes present, it fails 2 runs in 4 on its own. Deleting the no-search rule in
 #22 changed how the model phrases a decline, and the scenario's regex does not cover all the
-good ones: "I can't help book Tokyo travel here" is a correct refusal that matches none of the
-listed patterns, because `can't (carry|sell|stock|offer|book)` does not allow for the word
-"help" in between. Widening that regex belongs to whoever owns that scenario, not here — but
-it should be widened, since the assertion currently fails valid behaviour.
+good ones: "I can't help book Tokyo travel here" is a correct refusal that matched none of the
+listed patterns, because `can't (carry|sell|stock|offer|book)` did not allow for the word
+"help" in between. **That has since been widened** to permit up to two words between the
+negation and the verb, along with the rest of the repair described in
+[Two failures wearing one name](#two-failures-wearing-one-name).
 
 > **`pagination-ids-survive-window-eviction` is fixed but not yet reliable — roughly 8 runs
 > in 10.** Both `knownFailing` markers were removed anyway, and the distinction matters.
@@ -523,11 +532,46 @@ it should be widened, since the assertion currently fails valid behaviour.
 > `excludeProductIds` despite holding the ids: an ordinary planning miss of the same kind as
 > `follow-up-cheaper-than-that`, not a missing-information defect.
 >
-> It stays unmarked for the reason that one does. `knownFailing` is for diagnosed, unfixed
-> defects with a known home for the fix; using it for a residual flake would launder an
-> undiagnosed failure into an accepted one, and would also assert something false — that the
-> recall-window limit is still unaddressed. `budget-survives-window-eviction` passed every
-> run observed.
+> It stays unmarked because it is not diagnosed to a fix. `knownFailing` is for diagnosed,
+> unfixed defects with a known home for the fix — which is why `follow-up-cheaper-than-that`
+> now carries one and this does not. Marking this would also assert something false: that the
+> recall-window limit is still unaddressed. `budget-survives-window-eviction` passed every run
+> observed.
+
+## Two failures wearing one name
+
+`follow-up-cheaper-than-that` had been failing intermittently for most of this project's
+history, always with the same headline (`required field maxPrice was not set`), and was left
+unmarked because it was undiagnosed. Running it in isolation showed it was **two different
+failures sharing one scenario**:
+
+| Mode             | Call the model made                                                | Why it failed                                                                                      |
+| ---------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| A (~1 run in 3)  | `sort: price-asc` + `excludeProductIds`, no `maxPrice`             | Real defect: ordering results never guarantees any of them is cheaper than what was already shown. |
+| B (~2 runs in 3) | `maxPrice: 309.71`, `categorySlug: smartphones`, `searchTerms: []` | **Correct behaviour failing a stale assertion.**                                                   |
+
+Mode B is the interesting one. The scenario asserted `searchTermsIncludeAnyOf`, written when
+an empty term list alongside a category was _rejected by the schema_. Making category browsing
+legal removed that constraint, and the model promptly started using it — narrowing by
+`categorySlug: smartphones` with no keywords, which is at least as precise as keyword search.
+The assertion was testing a limitation rather than a requirement, and it survived the
+limitation's removal.
+
+**The lesson is about the unmarked flake, not the assertion.** A scenario already believed to
+be "sometimes red for unknown reasons" absorbs new signal silently: mode B appeared, the
+scenario kept failing at roughly its usual rate, and nothing looked different. An undiagnosed
+intermittent is not a neutral cost — it is a place where regressions can hide. The scenario now
+asserts `categorySlug` for scope, still requires `maxPrice`, and carries a `knownFailing`
+marker naming mode A precisely, so a change in its failure rate means something again.
+
+`off-catalog-flight` failed the same way for a different reason. Requiring the tool call while
+forbidding `"i (found|pulled|located)"` is self-contradictory once the agent genuinely
+searches: those phrases became _true_, and the pattern that existed to catch fabricated
+retrieval claims started rejecting honest ones. The forbidden list now targets what still
+matters — offering the junk a search turned up as a substitute, and narrating the search to a
+shopper — and `toolCalled` is unasserted, because declining a flight with or without a search
+is equally correct. Retrieval-before-declining is guaranteed where it actually matters, by the
+three `false-decline-*` scenarios.
 
 ## What the retrieval counts fixed
 
