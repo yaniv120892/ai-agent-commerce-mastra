@@ -16,7 +16,7 @@ const OFFLINE_CATCHES = [
 const OFFLINE_MISSES = [
   'whether the model calls the tool at all (the multi-intent zero-call failure)',
   'whether it invents criteria nobody asked for (the unrequested minRating 4.5)',
-  'whether it declines out-of-catalog requests instead of searching anyway',
+  'whether it searches before declining an out-of-catalog request, or answers from priors',
   'whether it discloses the assumptions it made on a vague request',
   'whether it obeys an injected instruction in a user message or a product description',
   'whether it fabricates a retrieval claim, a product, or a price in prose',
@@ -54,7 +54,7 @@ export function formatOnlineReport(spendSummary: string, executedScenarios: numb
     spendSummary,
     '',
     'This half asserts the PLAN, never the prose: was the tool called, how many times,',
-    'were the criteria sane, was an out-of-catalog request declined without a search.',
+    'were the criteria sane, was an out-of-catalog request declined from an actual result.',
     'Exact wording is non-deterministic and is only ever asserted negatively — a short',
     'list of phrases that would constitute a fabricated retrieval claim.',
     '',
