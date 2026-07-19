@@ -1,6 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { getNormalizedCatalog } from '@/catalog/catalog-cache';
-import { resolveProducts } from '@/catalog/resolve-products';
+import { resolveProductsWithTotals } from '@/catalog/resolve-products';
 import { retrievalCriteriaSchema } from '@/catalog/types';
 import type { RetrievalCriteria } from '@/catalog/types';
 import {
@@ -30,9 +30,9 @@ export const resolveProductsTool = createTool({
   execute: async (inputData) => {
     const criteria = toRetrievalCriteria(inputData);
     const catalog = await getNormalizedCatalog();
-    const products = resolveProducts(criteria, catalog);
+    const result = resolveProductsWithTotals(criteria, catalog);
 
-    return { products, resultCount: products.length, criteria };
+    return { ...result, resultCount: result.products.length, criteria };
   },
 });
 
