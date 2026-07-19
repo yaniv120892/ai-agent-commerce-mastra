@@ -27,6 +27,16 @@ describe('COMMERCE_AGENT_INSTRUCTIONS', () => {
     expect(COMMERCE_AGENT_INSTRUCTIONS).toContain('Do not fan out across categories');
   });
 
+  // The prompt used to tell the model not to search for things it "knew" were absent, and it
+  // duly denied stocking three products the catalog carries — with no tool call behind the
+  // denial, so nothing downstream could catch it. Only eval:online can prove the behaviour;
+  // this free assertion stops the sentence that fixed it being deleted silently.
+  it('makes an empty search, not a prior, the only thing that licenses a decline', () => {
+    expect(COMMERCE_AGENT_INSTRUCTIONS).toContain('came back empty in this turn');
+    expect(COMMERCE_AGENT_INSTRUCTIONS).not.toContain('do not call the tool');
+    expect(COMMERCE_AGENT_INSTRUCTIONS).not.toContain('search you already know will be empty');
+  });
+
   it('defers call mechanics to the tool description rather than restating them', () => {
     expect(COMMERCE_AGENT_INSTRUCTIONS).not.toContain('Good: ["laptop", "apple", "macbook"]');
     expect(COMMERCE_AGENT_INSTRUCTIONS).toContain("The tool's own description covers");
