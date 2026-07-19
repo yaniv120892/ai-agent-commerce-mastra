@@ -1,10 +1,10 @@
 # Evaluation suite
 
-Twenty-four scenarios in one golden dataset (`scenarios.json`), graded by two runners that
+Twenty-six scenarios in one golden dataset (`scenarios.json`), graded by two runners that
 answer two different questions.
 
 > [!IMPORTANT]
-> **Five scenarios are expected to fail.** They encode defects found by adversarial QA and
+> **Seven scenarios are expected to fail.** They encode defects found by adversarial QA and
 > diagnosed but not yet fixed, and they carry a `knownFailing` field that both runners print
 > at the end of a run. A red eval suite is the current correct state. See
 > [Known-failing scenarios](#known-failing-scenarios) before touching them — the one thing
@@ -74,32 +74,34 @@ bounded to 6 agent steps so one runaway tool loop cannot blow the budget between
 
 ## Scenario coverage
 
-| Scenario                                | Proves                                                  | Offline | Online |
-| --------------------------------------- | ------------------------------------------------------- | ------- | ------ |
-| `simple-category-laptops`               | baseline routing, one call, no invented filters         | yes     | yes    |
-| `price-constraint-smartphone-under-400` | numeric budget becomes `maxPrice` on list price         | yes     | yes    |
-| `rating-constraint-highly-rated`        | calibrated `minRating: 4.5`, not a guessed 4.0          | yes     | yes    |
-| `superlative-highest-rated-catalog`     | **regression** — one wide call, never a fan-out         | yes     | yes    |
-| `unrequested-rating-floor-regression`   | **regression** — no unrequested `minRating`             | yes     | yes    |
-| `ambiguous-cheap-and-cool`              | **regression** — assumptions stated out loud            | partial | yes    |
-| `off-catalog-flight`                    | declines with **zero** tool calls                       | no      | yes    |
-| `multi-intent-phone-and-laptop`         | **regression** — two intents, two real calls            | yes     | yes    |
-| `follow-up-cheaper-than-that`           | prior criteria carried forward, only price tightens     | yes     | yes    |
-| `show-me-more-pagination`               | `excludeProductIds` → zero overlap between pages        | yes     | yes    |
-| `brand-exclusion-no-apple`              | title-substring fallback where `brand` is missing       | yes     | yes    |
-| `prompt-injection-in-user-message`      | injected instructions treated as data                   | partial | yes    |
-| `zero-result-query`                     | empty is reported as empty, nothing invented            | yes     | yes    |
-| `min-order-trap-cheap-beauty`           | the $9.99 mascara that really costs $479.52             | yes     | yes    |
-| `upstream-zero-reversed-tokens`         | local resolution finds what `/products/search` cannot   | yes     | yes    |
-| `in-stock-only-laptops`                 | availability becomes `inStock`, not a search term       | yes     | yes    |
-| `false-decline-stocked-microwave`       | **known failing** — denies a stocked item, no search    | no      | yes    |
-| `false-decline-stocked-ice-cube-tray`   | **known failing** — same, second item                   | no      | yes    |
-| `false-decline-stocked-picture-frame`   | **known failing** — same, third item                    | no      | yes    |
-| `truncation-completeness-follow-up`     | `totalMatched` — a capped list is reported as partial   | yes     | yes    |
-| `truncation-invented-inventory-count`   | `totalInCategory` — stock counted, not cards            | yes     | yes    |
-| `zero-sentinel-empties-catalog`         | **known failing** — `maxPrice: 0` empties the catalog   | yes     | yes    |
-| `gendered-slug-unrequested-narrowing`   | **known failing** — gendered slug guessed unprompted    | no      | yes    |
-| `gendered-slug-false-scarcity`          | `totalMatchedWithoutCategoryFilter` — no false scarcity | partial | yes    |
+| Scenario                                 | Proves                                                  | Offline | Online |
+| ---------------------------------------- | ------------------------------------------------------- | ------- | ------ |
+| `simple-category-laptops`                | baseline routing, one call, no invented filters         | yes     | yes    |
+| `price-constraint-smartphone-under-400`  | numeric budget becomes `maxPrice` on list price         | yes     | yes    |
+| `rating-constraint-highly-rated`         | calibrated `minRating: 4.5`, not a guessed 4.0          | yes     | yes    |
+| `superlative-highest-rated-catalog`      | **regression** — one wide call, never a fan-out         | yes     | yes    |
+| `unrequested-rating-floor-regression`    | **regression** — no unrequested `minRating`             | yes     | yes    |
+| `ambiguous-cheap-and-cool`               | **regression** — assumptions stated out loud            | partial | yes    |
+| `off-catalog-flight`                     | declines with **zero** tool calls                       | no      | yes    |
+| `multi-intent-phone-and-laptop`          | **regression** — two intents, two real calls            | yes     | yes    |
+| `follow-up-cheaper-than-that`            | prior criteria carried forward, only price tightens     | yes     | yes    |
+| `show-me-more-pagination`                | `excludeProductIds` → zero overlap between pages        | yes     | yes    |
+| `brand-exclusion-no-apple`               | title-substring fallback where `brand` is missing       | yes     | yes    |
+| `prompt-injection-in-user-message`       | injected instructions treated as data                   | partial | yes    |
+| `zero-result-query`                      | empty is reported as empty, nothing invented            | yes     | yes    |
+| `min-order-trap-cheap-beauty`            | the $9.99 mascara that really costs $479.52             | yes     | yes    |
+| `upstream-zero-reversed-tokens`          | local resolution finds what `/products/search` cannot   | yes     | yes    |
+| `in-stock-only-laptops`                  | availability becomes `inStock`, not a search term       | yes     | yes    |
+| `false-decline-stocked-microwave`        | **known failing** — denies a stocked item, no search    | no      | yes    |
+| `false-decline-stocked-ice-cube-tray`    | **known failing** — same, second item                   | no      | yes    |
+| `false-decline-stocked-picture-frame`    | **known failing** — same, third item                    | no      | yes    |
+| `truncation-completeness-follow-up`      | `totalMatched` — a capped list is reported as partial   | yes     | yes    |
+| `truncation-invented-inventory-count`    | `totalInCategory` — stock counted, not cards            | yes     | yes    |
+| `zero-sentinel-empties-catalog`          | **known failing** — `maxPrice: 0` empties the catalog   | yes     | yes    |
+| `gendered-slug-unrequested-narrowing`    | **known failing** — gendered slug guessed unprompted    | no      | yes    |
+| `gendered-slug-false-scarcity`           | `totalMatchedWithoutCategoryFilter` — no false scarcity | partial | yes    |
+| `budget-survives-window-eviction`        | **known failing** — budget dropped once out of window   | no      | yes    |
+| `pagination-ids-survive-window-eviction` | **known failing** — shown ids lost, same page re-served | no      | yes    |
 
 Three scenarios are regression tests for failures actually observed in live runs and fixed
 by prompt changes:
@@ -116,8 +118,13 @@ silently, and only the **online** runner can see any of them.
 
 ## Results of the live run
 
-**Current status: 20 of 24 online scenarios pass**, 28 model calls, estimated spend
-**$0.055**. Offline is **37 passing / 3 failing**, all three inside
+**Current status: 20 of the 24 scenarios that existed at the time pass**, 28 model calls,
+estimated spend **$0.055**. The two eviction scenarios were added afterwards and run
+separately; both failed, and the whole suite has not been re-run end to end since, so treat
+the headline as 20 of 24 plus two known failures rather than a fresh 20 of 26. They are also
+the most expensive scenarios in the set — thirteen turns each against one or two for
+everything else — so budget for the spend cap to bind sooner once they run inline.
+Offline is **37 passing / 3 failing**, all three inside
 `zero-sentinel-empties-catalog`. Every failure is in the `knownFailing` set: findings 1 and 3,
 plus the slug half of finding 4. Trimming the counts section cut input tokens from 201k to
 188k over the same 28 calls (−7%) with no change in outcomes.
@@ -269,9 +276,11 @@ covered: `upstream-zero-reversed-tokens` asserts the first two directly,
 
 ## Known-failing scenarios
 
-Five scenarios encode defects found by an adversarial QA pass (32 probes against the live
-catalog) and confirmed against `https://dummyjson.com/products/...` directly. They are
-asserted exactly like every other scenario and they run **red on purpose**. Each carries a
+Seven scenarios run **red on purpose**: five encode defects found by an adversarial QA pass
+(32 probes against the live catalog) and confirmed against `https://dummyjson.com/products/...`
+directly, and two encode the recall-window limit described in
+[State that outlives the recall window](#state-that-outlives-the-recall-window). They are
+asserted exactly like every other scenario. Each carries a
 `knownFailing` string, which both runners print at the end of a run so an intentional red is
 never mistakable for rot.
 
@@ -282,15 +291,17 @@ Two of the original seven — plus half of a third — were fixed by the retriev
 weakening the assertion.** An eval tuned until it agrees with current behaviour tests
 nothing — the same principle that kept `ambiguous-cheap-and-cool` failing through YAN-38.
 
-| Scenario                              | Defect                                                                   | Where the fix belongs                          |
-| ------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
-| `false-decline-stocked-microwave`     | "this store doesn't carry microwaves" — zero tool calls; id 66 is $89.99 | `instructions.ts`                              |
-| `false-decline-stocked-ice-cube-tray` | same, id 62 at $5.99                                                     | `instructions.ts`                              |
-| `false-decline-stocked-picture-frame` | same, id 44 at $29.99                                                    | `instructions.ts`                              |
-| `zero-sentinel-empties-catalog`       | `maxPrice: 0` from a repair call eliminates all 27 groceries             | `resolve-products.ts` or `toRetrievalCriteria` |
-| `gendered-slug-unrequested-narrowing` | "watches under $200" narrowed to `mens-watches` unprompted               | `instructions.ts`                              |
+| Scenario                                 | Defect                                                                   | Where the fix belongs                          |
+| ---------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| `false-decline-stocked-microwave`        | "this store doesn't carry microwaves" — zero tool calls; id 66 is $89.99 | `instructions.ts`                              |
+| `false-decline-stocked-ice-cube-tray`    | same, id 62 at $5.99                                                     | `instructions.ts`                              |
+| `false-decline-stocked-picture-frame`    | same, id 44 at $29.99                                                    | `instructions.ts`                              |
+| `zero-sentinel-empties-catalog`          | `maxPrice: 0` from a repair call eliminates all 27 groceries             | `resolve-products.ts` or `toRetrievalCriteria` |
+| `gendered-slug-unrequested-narrowing`    | "watches under $200" narrowed to `mens-watches` unprompted               | `instructions.ts`                              |
+| `budget-survives-window-eviction`        | a $50 budget stated 12 turns back no longer reaches the model            | `memory.ts` — working memory                   |
+| `pagination-ids-survive-window-eviction` | "show me more" re-serves page one; the shown ids were evicted            | `memory.ts` — working memory                   |
 
-Three notes on reading them:
+Four notes on reading them:
 
 **Finding 1 is intermittent.** Three of eight stocked items probed with this phrasing were
 falsely declined, and the trigger is item-specific priors rather than sentence shape — "do
@@ -314,6 +325,49 @@ must not blanket-strip every zero.
 that hid which half moved. `gendered-slug-unrequested-narrowing` asserts the slug guess and
 stays red; `gendered-slug-false-scarcity` asserts only the claim it escalated into, and the
 counts fixed that.
+
+**The two eviction scenarios are a different class from the other five.** Findings 1–4 are
+defects in what the model does with the information it has. These two are defects in what
+information it is given at all, and no wording in `instructions.ts` can clear them — the
+constraint is not in the prompt to be reasoned about. They are the only known-failing
+scenarios whose fix is architectural rather than a prompt or catalog change.
+
+## State that outlives the recall window
+
+Every scenario above this section is one or two turns long, which meant the suite could not
+observe the agent's behaviour on a long conversation at all. These two can.
+
+`commerceMemory` recalls the last `HISTORY_WINDOW_MESSAGES` (20) messages. Measured against
+the mock model in `src/mastra/agent-memory.test.ts`, **a turn stores exactly two messages**,
+so the window holds ten turns: a sentinel stated on the first turn is still in the prompt
+after ten turns and gone after eleven. Both scenarios state their constraint twelve turns
+before the query that must honour it.
+
+The eleven filler turns are deliberately out-of-catalog requests ("do you sell plane
+tickets?"). The prompt already requires the agent to decline those without retrieving, which
+makes the filler cheap — one short call, no tool — and, more importantly, keeps it from
+adding product ids that would confound the exclusion assertion. The only already-shown ids
+in `pagination-ids-survive-window-eviction` are the ones now out of reach.
+
+What the live run showed, with both scenarios run in isolation:
+
+| Scenario                                 | Call the model actually made                                                              |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `budget-survives-window-eviction`        | `{"searchTerms":["gift","him","men"],"inStock":true,"sort":"relevance"}` — no `maxPrice`  |
+| `pagination-ids-survive-window-eviction` | `{"searchTerms":["kitchen","accessories"],"categorySlug":"kitchen-accessories"}` — no ids |
+
+Both failures are silent. Neither call is malformed, nothing throws, and the reply reads as a
+helpful answer; it simply ignores a constraint the shopper still considers live. In the second
+case the agent carried the category forward correctly — because the words "kitchen
+accessories" were in the query itself — while losing the six ids that only ever existed in the
+evicted tool result.
+
+**This is not data loss, which is why a bigger window is the wrong fix.** The companion test
+in `agent-memory.test.ts` asserts all three facts together: the constraint is absent from the
+prompt, absent from `recall()`, and still present in storage when read with a wider window. It
+still renders in the UI. Raising `lastMessages` moves the cliff further out and makes every
+turn more expensive; it does not remove the cliff. The state a shopper expects to persist —
+budget, excluded brands, products already seen — has to be held outside the transcript.
 
 ## What the retrieval counts fixed
 
