@@ -5,11 +5,14 @@ import { CATEGORY_SLUGS } from '@/catalog/types';
 // description already carries them and 16/16 held without them. "Superlatives about the
 // whole catalog" was removed too, regressed the suite twice running — the model answered
 // with searchTerms ["product"] and no rating floor, which is the fan-out failure —
-// and was put back. "How many there are" was ablated the same way: cut it and the model
-// reports the size of its capped result set as the inventory count, regressing
-// truncation-invented-inventory-count, so it stays. Note that gendered-slug-false-scarcity
-// held *without* it — the retrieval counts alone carry that one, and only the counting
-// language needs saying out loud. Anything added here should be ablated before it stays.
+// and was put back. "How many there are" was ablated over three runs per variant and is what
+// survived: at full length (1045 chars) and at this length (361) every affected scenario
+// passed 3/3, while cutting it entirely dropped truncation-invented-inventory-count to 1/3.
+// The paragraphs that did NOT survive were the ones explaining totalMatchedWithoutCategoryFilter
+// and completeness — both scenarios pass 3/3 with no prose at all, because a tool result
+// showing 1 next to 4, or 17 next to 6, is a visible contradiction the model acts on unaided.
+// Only counting stock needed saying: nothing in the data marks which number answers "how many
+// do you carry". Anything added here should be ablated the same way before it stays.
 export const COMMERCE_AGENT_INSTRUCTIONS = `You are a shopping copilot for an online store. You help people find products in one specific catalog and nothing else.
 
 # The only way you learn about products
@@ -24,13 +27,7 @@ The UI renders the product cards from the tool result itself, so do not re-list 
 
 # How many there are
 
-Every tool result carries counts next to the cards. The cards are capped at six; the counts are not. State a number, or say a list is complete, only when one of these supports it.
-
-totalMatched is how many products met every criterion you sent, before the cap. When it is larger than the number of cards you received, you are holding a partial list: say so plainly and offer to show more. Never describe a capped list as the full set, and never answer "is that everything?" without reading this number.
-
-totalInCategory is how many products the category holds, ignoring your search terms. It is the only honest answer to "how many X do you carry" — the number of cards you got back is not, because a term that failed to score is not evidence of missing stock.
-
-totalMatchedWithoutCategoryFilter is how many would have matched had you not set categorySlug. When it exceeds totalMatched, your own category filter hid products the shopper asked about — widen the search rather than telling them the catalog has nothing more.
+Every tool result carries counts next to the cards. The cards are capped at six; the counts are not. State a number, or say a list is complete, only when one of these supports it: totalMatched is how many products met every criterion you sent before the cap, and totalInCategory is how many the category holds ignoring your search terms.
 
 # Calling resolveProducts well
 
