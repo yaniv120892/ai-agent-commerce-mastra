@@ -1,10 +1,10 @@
 # Evaluation suite
 
-Twenty-three scenarios in one golden dataset (`scenarios.json`), graded by two runners that
+Twenty-four scenarios in one golden dataset (`scenarios.json`), graded by two runners that
 answer two different questions.
 
 > [!IMPORTANT]
-> **Seven scenarios are expected to fail.** They encode defects found by adversarial QA and
+> **Five scenarios are expected to fail.** They encode defects found by adversarial QA and
 > diagnosed but not yet fixed, and they carry a `knownFailing` field that both runners print
 > at the end of a run. A red eval suite is the current correct state. See
 > [Known-failing scenarios](#known-failing-scenarios) before touching them — the one thing
@@ -74,31 +74,32 @@ bounded to 6 agent steps so one runaway tool loop cannot blow the budget between
 
 ## Scenario coverage
 
-| Scenario                                | Proves                                                | Offline | Online |
-| --------------------------------------- | ----------------------------------------------------- | ------- | ------ |
-| `simple-category-laptops`               | baseline routing, one call, no invented filters       | yes     | yes    |
-| `price-constraint-smartphone-under-400` | numeric budget becomes `maxPrice` on list price       | yes     | yes    |
-| `rating-constraint-highly-rated`        | calibrated `minRating: 4.5`, not a guessed 4.0        | yes     | yes    |
-| `superlative-highest-rated-catalog`     | **regression** — one wide call, never a fan-out       | yes     | yes    |
-| `unrequested-rating-floor-regression`   | **regression** — no unrequested `minRating`           | yes     | yes    |
-| `ambiguous-cheap-and-cool`              | **regression** — assumptions stated out loud          | partial | yes    |
-| `off-catalog-flight`                    | declines with **zero** tool calls                     | no      | yes    |
-| `multi-intent-phone-and-laptop`         | **regression** — two intents, two real calls          | yes     | yes    |
-| `follow-up-cheaper-than-that`           | prior criteria carried forward, only price tightens   | yes     | yes    |
-| `show-me-more-pagination`               | `excludeProductIds` → zero overlap between pages      | yes     | yes    |
-| `brand-exclusion-no-apple`              | title-substring fallback where `brand` is missing     | yes     | yes    |
-| `prompt-injection-in-user-message`      | injected instructions treated as data                 | partial | yes    |
-| `zero-result-query`                     | empty is reported as empty, nothing invented          | yes     | yes    |
-| `min-order-trap-cheap-beauty`           | the $9.99 mascara that really costs $479.52           | yes     | yes    |
-| `upstream-zero-reversed-tokens`         | local resolution finds what `/products/search` cannot | yes     | yes    |
-| `in-stock-only-laptops`                 | availability becomes `inStock`, not a search term     | yes     | yes    |
-| `false-decline-stocked-microwave`       | **known failing** — denies a stocked item, no search  | no      | yes    |
-| `false-decline-stocked-ice-cube-tray`   | **known failing** — same, second item                 | no      | yes    |
-| `false-decline-stocked-picture-frame`   | **known failing** — same, third item                  | no      | yes    |
-| `truncation-completeness-follow-up`     | **known failing** — capped set called complete        | no      | yes    |
-| `truncation-invented-inventory-count`   | **known failing** — result-set size stated as stock   | no      | yes    |
-| `zero-sentinel-empties-catalog`         | **known failing** — `maxPrice: 0` empties the catalog | yes     | yes    |
-| `gendered-slug-false-scarcity`          | **known failing** — gendered slug → false scarcity    | no      | yes    |
+| Scenario                                | Proves                                                  | Offline | Online |
+| --------------------------------------- | ------------------------------------------------------- | ------- | ------ |
+| `simple-category-laptops`               | baseline routing, one call, no invented filters         | yes     | yes    |
+| `price-constraint-smartphone-under-400` | numeric budget becomes `maxPrice` on list price         | yes     | yes    |
+| `rating-constraint-highly-rated`        | calibrated `minRating: 4.5`, not a guessed 4.0          | yes     | yes    |
+| `superlative-highest-rated-catalog`     | **regression** — one wide call, never a fan-out         | yes     | yes    |
+| `unrequested-rating-floor-regression`   | **regression** — no unrequested `minRating`             | yes     | yes    |
+| `ambiguous-cheap-and-cool`              | **regression** — assumptions stated out loud            | partial | yes    |
+| `off-catalog-flight`                    | declines with **zero** tool calls                       | no      | yes    |
+| `multi-intent-phone-and-laptop`         | **regression** — two intents, two real calls            | yes     | yes    |
+| `follow-up-cheaper-than-that`           | prior criteria carried forward, only price tightens     | yes     | yes    |
+| `show-me-more-pagination`               | `excludeProductIds` → zero overlap between pages        | yes     | yes    |
+| `brand-exclusion-no-apple`              | title-substring fallback where `brand` is missing       | yes     | yes    |
+| `prompt-injection-in-user-message`      | injected instructions treated as data                   | partial | yes    |
+| `zero-result-query`                     | empty is reported as empty, nothing invented            | yes     | yes    |
+| `min-order-trap-cheap-beauty`           | the $9.99 mascara that really costs $479.52             | yes     | yes    |
+| `upstream-zero-reversed-tokens`         | local resolution finds what `/products/search` cannot   | yes     | yes    |
+| `in-stock-only-laptops`                 | availability becomes `inStock`, not a search term       | yes     | yes    |
+| `false-decline-stocked-microwave`       | **known failing** — denies a stocked item, no search    | no      | yes    |
+| `false-decline-stocked-ice-cube-tray`   | **known failing** — same, second item                   | no      | yes    |
+| `false-decline-stocked-picture-frame`   | **known failing** — same, third item                    | no      | yes    |
+| `truncation-completeness-follow-up`     | `totalMatched` — a capped list is reported as partial   | yes     | yes    |
+| `truncation-invented-inventory-count`   | `totalInCategory` — stock counted, not cards            | yes     | yes    |
+| `zero-sentinel-empties-catalog`         | **known failing** — `maxPrice: 0` empties the catalog   | yes     | yes    |
+| `gendered-slug-unrequested-narrowing`   | **known failing** — gendered slug guessed unprompted    | no      | yes    |
+| `gendered-slug-false-scarcity`          | `totalMatchedWithoutCategoryFilter` — no false scarcity | partial | yes    |
 
 Three scenarios are regression tests for failures actually observed in live runs and fixed
 by prompt changes:
@@ -115,18 +116,60 @@ silently, and only the **online** runner can see any of them.
 
 ## Results of the live run
 
-**Current status: 16 of 23 scenarios pass**, 27 model calls, estimated spend **$0.048**.
-The seven failures are the `knownFailing` set above — every scenario that passed before the
-QA pass still passes. All three regression scenarios pass. The offline half is 34 passing /
-3 failing, all three inside `zero-sentinel-empties-catalog`.
+**Current status: 20 of 24 online scenarios pass**, 28 model calls, estimated spend
+**$0.055**. Offline is **37 passing / 3 failing**, all three inside
+`zero-sentinel-empties-catalog`. Every failure is in the `knownFailing` set: findings 1 and 3,
+plus the slug half of finding 4. Trimming the counts section cut input tokens from 201k to
+188k over the same 28 calls (−7%) with no change in outcomes.
 
-> **A second intermittent, unrelated to the QA findings.** Across the two runs recorded here,
-> `follow-up-cheaper-than-that` passed once and failed once with `required field maxPrice was
-not set` — the model narrowed with `sort: price-asc` plus `excludeProductIds` instead of a
-> price ceiling. That is a real assertion failure with a real model call behind it, not the
-> transient-API flake described below, and it predates these scenarios. Left unfixed and
-> unmarked: it needs its own diagnosis rather than a `knownFailing` label applied on the
-> strength of two runs.
+Read the count with care: the three `false-decline-*` scenarios are **unfixed**, and how many
+of them fail varies run to run. Finding 1 is intermittent by nature — 3 of 8 stocked items
+probed were falsely declined, driven by item-specific priors rather than sentence shape — so
+across the runs recorded during this work they failed variously zero, two, two and three at a
+time. A green run does not mean the defect is gone; that is exactly why they keep their
+`knownFailing` marker until the prompt rule lands.
+
+> **One flake, not caused by the counts.** `follow-up-cheaper-than-that` passed three of five
+> runs and failed twice with a real model call behind it (`required field maxPrice was not
+set` — the model narrows with `sort: price-asc` plus `excludeProductIds` instead of a price
+> ceiling). It failed this way before the counts existed. Left unfixed and deliberately
+> **unmarked**: labelling it `knownFailing` would launder an undiagnosed failure into an
+> accepted one.
+>
+> Separately, `truncation-completeness-follow-up` twice failed in ~25ms having made no model
+> call, then passed when run alone and again in the final full run. That is the transient-API
+> flake described below — but note it landed on the _same_ scenario twice, which the original
+> characterisation ("a different scenario each time") did not predict. If it recurs there
+> specifically, it is worth a look rather than a re-run.
+
+### The ablation for "How many there are"
+
+The counts are data; the section tells the model to read them. Three runs per variant, over
+the three scenarios the counts affect:
+
+| Variant                       | Size    | `truncation-completeness-follow-up` | `truncation-invented-inventory-count` | `gendered-slug-false-scarcity` |
+| ----------------------------- | ------- | ----------------------------------- | ------------------------------------- | ------------------------------ |
+| Full section as first written | 1045 ch | 3/3                                 | 3/3                                   | 3/3                            |
+| **Trimmed (kept)**            | 361 ch  | 3/3                                 | **3/3**                               | 3/3                            |
+| Cut entirely                  | 0       | 3/3                                 | **1/3**                               | 3/3                            |
+
+Two thirds of what was first written was dead weight, and the pattern in which parts died is
+the interesting result.
+
+**Data that contains a visible contradiction needs no prose.** Completeness and false scarcity
+both hold 3/3 with _no section at all_. A tool result showing `totalMatched: 1` beside
+`totalMatchedWithoutCategoryFilter: 4`, or `17` beside 6 cards, is self-evident — the model
+acts on it unaided, and the paragraphs explaining those two were deleted.
+
+**Data that needs an interpretive rule does need prose.** Nothing in the result marks _which_
+number answers "how many do you carry", so without the section the model still reports its
+capped result set as the inventory — 1 of 3 runs. Note the failure is probabilistic, not
+deterministic; the single-run ablation that first justified this section happened to catch it
+and reported more confidence than one run can support.
+
+The general rule this suggests: **prefer making the right answer structurally visible over
+instructing the model to find it.** Reach for prose only where the data cannot speak for
+itself, and measure which of those it actually is rather than assuming.
 
 The history below is kept deliberately — the two failures this suite caught, and how one of
 them was diagnosed, are the point of having built it.
@@ -196,6 +239,7 @@ expectation key; `searchTermsIncludeAnyOf` could only assert inclusion, never em
 | Five `categorySlug` paragraphs → one              | **16/16 — removed.** The refine enforces the rule the prose was pleading for. |
 | Call mechanics duplicated in the tool description | **16/16 — removed.** Input tokens fell 140k → 109k per run (−22%).            |
 | §"Superlatives about the whole catalog"           | **Regressed twice — put back.**                                               |
+| §"How many there are" (added with the counts)     | **Cut to a third of its length — kept at 361 chars.** See below.              |
 
 The last row is the point. Without that section the model answers "your highest rated
 products" with `searchTerms: ["product"]` and no rating floor — the fan-out failure,
@@ -225,25 +269,26 @@ covered: `upstream-zero-reversed-tokens` asserts the first two directly,
 
 ## Known-failing scenarios
 
-Seven scenarios encode defects found by an adversarial QA pass (32 probes against the live
+Five scenarios encode defects found by an adversarial QA pass (32 probes against the live
 catalog) and confirmed against `https://dummyjson.com/products/...` directly. They are
 asserted exactly like every other scenario and they run **red on purpose**. Each carries a
 `knownFailing` string, which both runners print at the end of a run so an intentional red is
 never mistakable for rot.
 
+Two of the original seven — plus half of a third — were fixed by the retrieval counts; see
+[What the retrieval counts fixed](#what-the-retrieval-counts-fixed).
+
 **The rule: clear one by fixing the agent, then delete its `knownFailing` field. Never by
 weakening the assertion.** An eval tuned until it agrees with current behaviour tests
 nothing — the same principle that kept `ambiguous-cheap-and-cool` failing through YAN-38.
 
-| Scenario                              | Defect                                                                    | Where the fix belongs                                |
-| ------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `false-decline-stocked-microwave`     | "this store doesn't carry microwaves" — zero tool calls; id 66 is $89.99  | `instructions.ts`                                    |
-| `false-decline-stocked-ice-cube-tray` | same, id 62 at $5.99                                                      | `instructions.ts`                                    |
-| `false-decline-stocked-picture-frame` | same, id 44 at $29.99                                                     | `instructions.ts`                                    |
-| `truncation-completeness-follow-up`   | 6 of 17 sports accessories called "the full list… no hidden pages"        | `resolve-products.ts` — needs a pre-truncation total |
-| `truncation-invented-inventory-count` | "we carry 4 different men's shoes"; there are 5                           | `resolve-products.ts` — same missing total           |
-| `zero-sentinel-empties-catalog`       | `maxPrice: 0` from a repair call eliminates all 27 groceries              | `resolve-products.ts` or `toRetrievalCriteria`       |
-| `gendered-slug-false-scarcity`        | "watches under $200" → `mens-watches`, then a catalog-wide scarcity claim | `instructions.ts`                                    |
+| Scenario                              | Defect                                                                   | Where the fix belongs                          |
+| ------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| `false-decline-stocked-microwave`     | "this store doesn't carry microwaves" — zero tool calls; id 66 is $89.99 | `instructions.ts`                              |
+| `false-decline-stocked-ice-cube-tray` | same, id 62 at $5.99                                                     | `instructions.ts`                              |
+| `false-decline-stocked-picture-frame` | same, id 44 at $29.99                                                    | `instructions.ts`                              |
+| `zero-sentinel-empties-catalog`       | `maxPrice: 0` from a repair call eliminates all 27 groceries             | `resolve-products.ts` or `toRetrievalCriteria` |
+| `gendered-slug-unrequested-narrowing` | "watches under $200" narrowed to `mens-watches` unprompted               | `instructions.ts`                              |
 
 Three notes on reading them:
 
@@ -257,19 +302,58 @@ catalog. What is missing is the boundary between a _category_ the store does not
 (flights — correctly declined, covered by `off-catalog-flight`) and a _product_ it has simply
 not checked.
 
-**Finding 2 cannot be fixed in the prompt.** `resolveProducts` returns `ProductCard[]` capped
-at `MAX_RESULTS = 6`, and `resultCount` is the post-slice length. Nothing in the tool output
-carries how many products matched before truncation, so the honest answer — "6 of 17" —
-does not exist anywhere in the model's input. The prompt could only instruct it to hedge
-every list, which is worse UX and still guesswork. `truncation-completeness-follow-up`
-deliberately leaves `toolCalled` unasserted: answering honestly from the capped set is as
-correct as searching again, and requiring a call would fail correct behaviour.
+**Finding 2 was fixed by the retrieval counts, not by the prompt** — see below.
 
-**Finding 3 is the only one with deterministic offline coverage**, and it is the reason to
-run `eval:offline` first — it fails every time, in 400ms, at zero cost, while the online half
-reproduces it only sometimes. Its five offline calls isolate one sentinel each, so a failure
-names the field. `minReturnDays: 0` is included and **passes**: it is a harmless no-op, which
-is why the fix must not blanket-strip every zero.
+**Finding 3 fails deterministically offline**, which is the reason to run `eval:offline`
+first — it fails every time, in 400ms, at zero cost, while the online half reproduces it only
+sometimes. Its five offline calls isolate one sentinel each, so a failure names the field.
+`minReturnDays: 0` is included and **passes**: it is a harmless no-op, which is why the fix
+must not blanket-strip every zero.
+
+**Finding 4 was split in two**, because one scenario was asserting two separate defects and
+that hid which half moved. `gendered-slug-unrequested-narrowing` asserts the slug guess and
+stays red; `gendered-slug-false-scarcity` asserts only the claim it escalated into, and the
+counts fixed that.
+
+## What the retrieval counts fixed
+
+`resolveProducts` used to return `ProductCard[]` capped at `MAX_RESULTS = 6`, and
+`resultCount` was the post-slice length. The model had no way to tell a complete list from
+the first six of many, or to know what a `categorySlug` had hidden — so every count and every
+completeness claim it wrote was the only number it had, not the true one. That is not a
+prompt problem; the honest answer did not exist in its input.
+
+`resolveProductsWithTotals` now returns three counts alongside the cards:
+
+| Count                               | Answers                                                |
+| ----------------------------------- | ------------------------------------------------------ |
+| `totalMatched`                      | how many met every criterion, before the cap           |
+| `totalInCategory`                   | how many the category holds, ignoring search terms     |
+| `totalMatchedWithoutCategoryFilter` | how many would have matched without the `categorySlug` |
+
+`resolveProducts` is unchanged — it is now a one-line wrapper returning `.products`, so all
+25 existing call sites and every offline assertion kept working untouched.
+
+Three scenarios went green:
+
+- **`truncation-completeness-follow-up`** — _"There are more: 17 products matched, and I only
+  showed 6. So this is not the complete list."_ Previously: _"That's the full list I'm
+  seeing… there aren't any hidden pages from this search."_
+- **`truncation-invented-inventory-count`** — `totalInCategory` separates stock from cards.
+  The old failure counted 4 cards and reported 4 as the inventory; there are 5.
+- **`gendered-slug-false-scarcity`** — the false catalog-wide claim is now contradicted by the
+  model's own tool result.
+
+**Truncation also gained deterministic offline coverage it could not previously have.** The
+fixture's largest category holds 3 products, under the cap of 6, so truncation was
+unreachable from a category search. `totalMatched` makes it directly assertable: an
+unfiltered whole-catalog call returns 6 cards and `totalMatched: 26`. Same for the count gap
+— search terms that fail to score leave zero cards while `totalInCategory` still reports 3.
+
+A partial win worth noting even though its scenario stays red: on `zero-sentinel-empties-catalog`
+the reply improved from _"I couldn't pull any grocery items"_ to _"there are 27 grocery items
+in the catalog"_. `totalInCategory` gives a true number even when the poisoned search returns
+nothing. The scenario still fails, correctly — zero products came back.
 
 ## What each half genuinely catches — and what slips through
 

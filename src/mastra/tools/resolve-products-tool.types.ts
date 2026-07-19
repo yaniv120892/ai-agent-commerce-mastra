@@ -38,6 +38,9 @@ export const resolveProductsOutputSchema = z.object({
   products: productCardSchema.array(),
   resultCount: z.number(),
   criteria: retrievalCriteriaSchema,
+  totalMatched: z.number(),
+  totalMatchedWithoutCategoryFilter: z.number().optional(),
+  totalInCategory: z.number().optional(),
 });
 
 export type ResolveProductsInput = z.infer<typeof resolveProductsInputSchema>;

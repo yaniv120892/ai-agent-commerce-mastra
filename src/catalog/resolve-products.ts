@@ -1,4 +1,10 @@
-import type { NormalizedProduct, ProductCard, RetrievalCriteria, SortOption } from './types';
+import type {
+  NormalizedProduct,
+  ProductCard,
+  RetrievalCriteria,
+  RetrievalResult,
+  SortOption,
+} from './types';
 
 type ScoredProduct = {
   product: NormalizedProduct;
@@ -26,17 +32,66 @@ const PARTIAL_MATCH_QUALITY = 0.5;
 const MINIMUM_PARTIAL_MATCH_LENGTH = 4;
 const COVERAGE_FLOOR = 0.25;
 
+// The counts exist because `products` is capped at MAX_RESULTS, and a caller holding only
+// a capped list cannot tell "this is everything" from "this is the first six of many". The
+// two category counts answer the questions a categorySlug makes unanswerable: how much the
+// filter hid, and how large the category is regardless of search terms.
+export function resolveProductsWithTotals(
+  criteria: RetrievalCriteria,
+  catalog: NormalizedProduct[],
+): RetrievalResult {
+  const retained = selectMatching(criteria, catalog);
+
+  return {
+    products: retained.slice(0, MAX_RESULTS).map((entry) => toProductCard(entry.product)),
+    totalMatched: retained.length,
+    totalMatchedWithoutCategoryFilter: countMatchedWithoutCategoryFilter(criteria, catalog),
+    totalInCategory: countInCategory(criteria, catalog),
+  };
+}
+
 export function resolveProducts(
   criteria: RetrievalCriteria,
   catalog: NormalizedProduct[],
 ): ProductCard[] {
+  return resolveProductsWithTotals(criteria, catalog).products;
+}
+
+function selectMatching(
+  criteria: RetrievalCriteria,
+  catalog: NormalizedProduct[],
+): ScoredProduct[] {
   const searchTerms = normalizeSearchTerms(criteria.searchTerms);
   const eligible = catalog.filter((product) => passesHardFilters(product, criteria));
   const scored = scoreProducts(eligible, searchTerms);
   const sorted = sortScoredProducts(scored, criteria.sort ?? 'relevance');
-  const retained = sorted.filter((entry) => !isExcluded(entry.product, criteria));
 
-  return retained.slice(0, MAX_RESULTS).map((entry) => toProductCard(entry.product));
+  return sorted.filter((entry) => !isExcluded(entry.product, criteria));
+}
+
+function countMatchedWithoutCategoryFilter(
+  criteria: RetrievalCriteria,
+  catalog: NormalizedProduct[],
+): number | undefined {
+  if (criteria.categorySlug === undefined) {
+    return undefined;
+  }
+
+  return selectMatching({ ...criteria, categorySlug: undefined }, catalog).length;
+}
+
+// Deliberately ignores searchTerms and every other filter: this answers "how many of these
+// do you stock", where a term that failed to score is not evidence of absent inventory.
+function countInCategory(
+  criteria: RetrievalCriteria,
+  catalog: NormalizedProduct[],
+): number | undefined {
+  const { categorySlug } = criteria;
+  if (categorySlug === undefined) {
+    return undefined;
+  }
+
+  return catalog.filter((product) => product.category === categorySlug).length;
 }
 
 function passesHardFilters(product: NormalizedProduct, criteria: RetrievalCriteria): boolean {
