@@ -9,6 +9,11 @@ type CommerceThread = Awaited<ReturnType<CommerceMemory['getThreadById']>>;
 
 export const runtime = 'nodejs';
 
+// Matches the eval harness, which has always run bounded. A turn needs one step to call
+// resolveProducts and one to reply; multi-intent turns need a call per intent, so six leaves
+// headroom without letting a tool loop bill indefinitely.
+export const MAX_STEPS_PER_TURN = 6;
+
 export async function POST(request: Request) {
   // Kept untyped: handleChatStream's v6 overload only resolves against the raw
   // request body shape, and narrowing it here silently selects the v5 overload.
@@ -50,7 +55,10 @@ export async function POST(request: Request) {
       version: 'v6',
       params: {
         ...params,
+        // Both of these sit after the spread deliberately: the client body is forwarded
+        // wholesale, so a field that must be server-controlled has to be written last.
         memory: { thread: threadId, resource: LOCAL_RESOURCE_ID },
+        maxSteps: MAX_STEPS_PER_TURN,
       },
       // A failure once the stream is open can no longer become an HTTP status, so it
       // reaches the user as an error part instead of a turn that just stops.
