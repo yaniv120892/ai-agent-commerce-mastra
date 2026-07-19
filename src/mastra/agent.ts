@@ -12,6 +12,12 @@ export const COMMERCE_AGENT_ID = 'commerceAgent';
 // message parts of type `tool-resolveProducts`, which the UI renders cards from.
 export const COMMERCE_TOOLS = { resolveProducts: resolveProductsTool };
 
+// Not exported by @mastra/memory, but enabling working memory registers a tool under this
+// exact name. It is absent from COMMERCE_TOOLS because the agent never declares it, so
+// KnownToolsOnlyProcessor would strip the call the model just made from its own next step —
+// the model would see no evidence it stored anything and re-call until the step budget ran out.
+const WORKING_MEMORY_TOOL_NAME = 'updateWorkingMemory';
+
 export const commerceAgent = new Agent({
   id: COMMERCE_AGENT_ID,
   name: 'Commerce Copilot',
@@ -19,5 +25,7 @@ export const commerceAgent = new Agent({
   model: openai(getEnv().OPENAI_MODEL),
   tools: COMMERCE_TOOLS,
   memory: commerceMemory,
-  inputProcessors: [new KnownToolsOnlyProcessor(Object.keys(COMMERCE_TOOLS))],
+  inputProcessors: [
+    new KnownToolsOnlyProcessor([...Object.keys(COMMERCE_TOOLS), WORKING_MEMORY_TOOL_NAME]),
+  ],
 });
