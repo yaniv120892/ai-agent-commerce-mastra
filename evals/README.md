@@ -4,7 +4,7 @@ Twenty-four scenarios in one golden dataset (`scenarios.json`), graded by two ru
 answer two different questions.
 
 > [!IMPORTANT]
-> **Five scenarios are expected to fail.** They encode defects found by adversarial QA and
+> **Four scenarios are expected to fail.** They encode defects found by adversarial QA and
 > diagnosed but not yet fixed, and they carry a `knownFailing` field that both runners print
 > at the end of a run. A red eval suite is the current correct state. See
 > [Known-failing scenarios](#known-failing-scenarios) before touching them — the one thing
@@ -117,10 +117,12 @@ silently, and only the **online** runner can see any of them.
 ## Results of the live run
 
 **Current status: 20 of 24 online scenarios pass**, 28 model calls, estimated spend
-**$0.055**. Offline is **37 passing / 3 failing**, all three inside
-`zero-sentinel-empties-catalog`. Every failure is in the `knownFailing` set: findings 1 and 3,
-plus the slug half of finding 4. Trimming the counts section cut input tokens from 201k to
-188k over the same 28 calls (−7%) with no change in outcomes.
+**$0.048**. Offline is **40 of 40**. Every online failure is in the `knownFailing` set: the
+three `false-decline-*` scenarios and `gendered-slug-unrequested-narrowing`.
+
+Making category browsing legal also cut input tokens from 188k to 162k over the same 28
+calls (−14%), because the grocery query no longer spends a rejected call plus two repair
+attempts before giving up.
 
 Read the count with care: the three `false-decline-*` scenarios are **unfixed**, and how many
 of them fail varies run to run. Finding 1 is intermittent by nature — 3 of 8 stocked items
@@ -269,7 +271,7 @@ covered: `upstream-zero-reversed-tokens` asserts the first two directly,
 
 ## Known-failing scenarios
 
-Five scenarios encode defects found by an adversarial QA pass (32 probes against the live
+Four scenarios encode defects found by an adversarial QA pass (32 probes against the live
 catalog) and confirmed against `https://dummyjson.com/products/...` directly. They are
 asserted exactly like every other scenario and they run **red on purpose**. Each carries a
 `knownFailing` string, which both runners print at the end of a run so an intentional red is
@@ -282,13 +284,12 @@ Two of the original seven — plus half of a third — were fixed by the retriev
 weakening the assertion.** An eval tuned until it agrees with current behaviour tests
 nothing — the same principle that kept `ambiguous-cheap-and-cool` failing through YAN-38.
 
-| Scenario                              | Defect                                                                   | Where the fix belongs                          |
-| ------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
-| `false-decline-stocked-microwave`     | "this store doesn't carry microwaves" — zero tool calls; id 66 is $89.99 | `instructions.ts`                              |
-| `false-decline-stocked-ice-cube-tray` | same, id 62 at $5.99                                                     | `instructions.ts`                              |
-| `false-decline-stocked-picture-frame` | same, id 44 at $29.99                                                    | `instructions.ts`                              |
-| `zero-sentinel-empties-catalog`       | `maxPrice: 0` from a repair call eliminates all 27 groceries             | `resolve-products.ts` or `toRetrievalCriteria` |
-| `gendered-slug-unrequested-narrowing` | "watches under $200" narrowed to `mens-watches` unprompted               | `instructions.ts`                              |
+| Scenario                              | Defect                                                                   | Where the fix belongs |
+| ------------------------------------- | ------------------------------------------------------------------------ | --------------------- |
+| `false-decline-stocked-microwave`     | "this store doesn't carry microwaves" — zero tool calls; id 66 is $89.99 | `instructions.ts`     |
+| `false-decline-stocked-ice-cube-tray` | same, id 62 at $5.99                                                     | `instructions.ts`     |
+| `false-decline-stocked-picture-frame` | same, id 44 at $29.99                                                    | `instructions.ts`     |
+| `gendered-slug-unrequested-narrowing` | "watches under $200" narrowed to `mens-watches` unprompted               | `instructions.ts`     |
 
 Three notes on reading them:
 
@@ -304,11 +305,21 @@ not checked.
 
 **Finding 2 was fixed by the retrieval counts, not by the prompt** — see below.
 
-**Finding 3 fails deterministically offline**, which is the reason to run `eval:offline`
-first — it fails every time, in 400ms, at zero cost, while the online half reproduces it only
-sometimes. Its five offline calls isolate one sentinel each, so a failure names the field.
-`minReturnDays: 0` is included and **passes**: it is a harmless no-op, which is why the fix
-must not blanket-strip every zero.
+**Finding 3 is fixed.** Two changes, because the sentinels were a symptom rather than the
+cause. The cause was a validation rule rejecting empty `searchTerms` alongside a
+`categorySlug` — which made "show me all your groceries" unexpressible, and the zero
+sentinels were the model trying to repair around that rejection. Browsing a category is now
+legal, and `maxPrice: 0` / `maxShippingDays: 0` are ignored as the placeholders they are.
+`minReturnDays: 0` is deliberately left alone: it is already a no-op, and stripping every
+zero would discard real filters alongside placeholders.
+
+Removing that rule was the risk in this change — the README credits it with allowing five
+`categorySlug` paragraphs to be deleted from the prompt. Measured over three runs on the four
+scenarios that would show a regression (`ambiguous-cheap-and-cool`,
+`superlative-highest-rated-catalog`, `simple-category-laptops`, plus the fixed scenario
+itself): **12/12 pass.** The protection now lives in the tool description, which names the
+thing actually worth preventing — picking a category the shopper never named — rather than
+banning a field combination that has a legitimate use.
 
 **Finding 4 was split in two**, because one scenario was asserting two separate defects and
 that hid which half moved. `gendered-slug-unrequested-narrowing` asserts the slug guess and

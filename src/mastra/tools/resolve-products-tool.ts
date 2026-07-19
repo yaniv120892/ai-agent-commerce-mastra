@@ -18,7 +18,7 @@ searchTerms is a list of short, specific terms, not a sentence. Each term is sco
 
 Express constraints as fields rather than terms: maxPrice/minPrice for budget (matched against list price), minRating for quality (use 4.5 for "highly rated" — the catalog median is 3.86), inStock for availability, maxShippingDays for urgency, minReturnDays for returnability, excludeBrands and excludeProductIds to suppress results already shown or rejected. sort (relevance, price-asc, price-desc, rating-desc, discount-desc) answers a superlative better than a filter does.
 
-categorySlug is a hard filter that hides everything outside it, so set it only when the shopper named a category or an unambiguous product type. If searchTerms is empty, categorySlug must be omitted: the two fields must agree about how wide the search is, and there is no neutral default category.
+categorySlug is a hard filter that hides everything outside it, so set it only when the shopper named a category or an unambiguous product type. Sending it with an empty searchTerms list is the right way to browse a whole category ("show me all your groceries"); what to avoid is picking a category the shopper never named, which silently answers a broad request with one twenty-fourth of the catalog.
 
 Call it once per distinct thing the shopper asked for. Two intents ("a phone and a laptop") means two calls, never one blended query — but one broad question ("your highest rated products") means one wide call, never one call per guessed category.`;
 
