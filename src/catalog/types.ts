@@ -132,9 +132,17 @@ export type RetrievalCriteria = z.infer<typeof retrievalCriteriaSchema>;
 
 // The two category counts are undefined when the criteria carried no categorySlug — there
 // is no category to have hidden anything or to have a size.
+//
+// remainingAfterThisPage is required rather than optional because 0 is a meaningful answer —
+// "that is all of them" — and an absent field reads as "unknown", which is the one thing it
+// never is. It exists because totalMatched counts the products on this page as well as the
+// ones beyond it: on page two of a paginated request the cards being displayed are inside
+// totalMatched, so a reader subtracting for itself routinely reports the whole remainder as
+// unseen.
 export type RetrievalResult = {
   products: ProductCard[];
   totalMatched: number;
+  remainingAfterThisPage: number;
   totalMatchedWithoutCategoryFilter: number | undefined;
   totalInCategory: number | undefined;
 };

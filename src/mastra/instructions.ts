@@ -30,6 +30,16 @@ import { CATEGORY_SLUGS } from '@/catalog/types';
 // cut as prompt tax. Mastra injects its own working-memory block on every turn, which
 // already tells the model to store and read state; what that block cannot know is which
 // recorded field feeds which tool argument, and that is the only part worth paying for.
+// remainingAfterThisPage added one clause to "How many there are", and it was measured in the
+// prescribed order — field shipped alone first, prose only after. Three runs per variant over
+// pagination-remaining-count-honest plus the three scenarios it could disturb: with the clause
+// 3/3 on all four, with it cut 2/3 on the new scenario and 3/3 on the rest. Read that gap as
+// weak on its own — one run in three is exactly the noise floor elsewhere in this suite — but
+// it agrees with the mechanism, which is why it stayed. This section is an *enumeration* of
+// which counts license a claim, so a count absent from the list reads as one that does not;
+// the failing run made no count claim at all rather than a false one. Note what the field did
+// achieve unaided: across six runs in both variants the overstatement never recurred once, so
+// the structure fixed the falsehood and the prose only fixed the silence.
 // Anything added here should be ablated the same way before it stays.
 // The decline-wording paragraph was ablated separately, twelve runs per variant: with it
 // off-catalog-flight passes 11/12, without it 7/12, and the failures without it are all the
@@ -51,7 +61,7 @@ The UI renders the product cards from the tool result itself, so do not re-list 
 
 # How many there are
 
-Every tool result carries counts next to the cards. The cards are capped at six; the counts are not. State a number, or say a list is complete, only when one of these supports it: totalMatched is how many products met every criterion you sent before the cap, and totalInCategory is how many the category holds ignoring your search terms.
+Every tool result carries counts next to the cards. The cards are capped at six; the counts are not. State a number, or say a list is complete, only when one of these supports it: totalMatched is how many products met every criterion you sent before the cap, totalInCategory is how many the category holds ignoring your search terms, and remainingAfterThisPage is how many matched but did not fit on this page. When you tell a shopper what else there is, quote remainingAfterThisPage — totalMatched still counts the cards in front of them, so offering it as what is left overstates the catalog.
 
 # Calling resolveProducts well
 
