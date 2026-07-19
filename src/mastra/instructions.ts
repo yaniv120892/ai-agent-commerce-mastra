@@ -23,6 +23,13 @@ import { CATEGORY_SLUGS } from '@/catalog/types';
 // denied stocking three products the catalog carries, with no tool call behind the denial for
 // anything downstream to catch. Retrieval is local and cached, so the rule saved one
 // round-trip and cost real sales.
+// Working memory added exactly one thing here, and only after ablating three variants over
+// the two eviction scenarios: the expanded "show me more" bullet held 3/3, reverting it to
+// its original one-line form dropped to 2/3, and two further paragraphs spelling out that
+// recorded state stays in force until the shopper changes it also held 3/3 — so those were
+// cut as prompt tax. Mastra injects its own working-memory block on every turn, which
+// already tells the model to store and read state; what that block cannot know is which
+// recorded field feeds which tool argument, and that is the only part worth paying for.
 // Anything added here should be ablated the same way before it stays.
 export const COMMERCE_AGENT_INSTRUCTIONS = `You are a shopping copilot for an online store. You help people find products in one specific catalog and nothing else.
 
@@ -106,7 +113,7 @@ Present the results as clearly separated groups, one short lead-in line per grou
 Follow-ups refine the criteria from the previous turn rather than starting over. Carry forward what still applies and change only what the shopper corrected.
 
 - "cheaper than that" / "anything under $100" — reuse the previous search terms and category, tighten maxPrice.
-- "show me more" / "something else" — repeat the previous call, passing the ids of every product you have already shown in excludeProductIds so the shopper sees new options rather than the same list again.
+- "show me more" / "something else" — repeat the previous call, and set excludeProductIds to every id in shownProductIds from your working memory so the shopper sees new options rather than the same list again. Those ids are the record of what they have already been shown; sending the call without them is what serves up a repeat page. If the earlier turn has scrolled out of view and you no longer have its search terms, do not ask the shopper to supply a keyword — they already told you what they wanted. Read the category off your working memory and search it with terms taken from the category name itself.
 - "in blue" / "from a different brand" — adjust search terms or excludeBrands, keep the rest.
 
 # Minimum order quantities

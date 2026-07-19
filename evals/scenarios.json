@@ -911,7 +911,6 @@
         "can I hire a plumber through you?"
       ],
       "proves": "A budget the shopper stated once still binds the search twelve turns later. The shopper never withdrew it, so a recommendation over $50 contradicts a constraint they consider live.",
-      "knownFailing": "The $50 budget lives only as prose in the recall window. A turn stores two messages, so the 20-message recall window holds ten turns. The constraint here is stated twelve turns before the query that must honour it, which puts it outside the window: measured against the mock model, a sentinel stated on the first turn is still in the prompt after ten turns and gone after eleven. Nothing else persists it, so the model cannot recover it. The turn retrieves without maxPrice and recommends products the shopper cannot afford, with no error anywhere. Fixing this needs the budget held outside the window as working memory, not a larger window.",
       "expect": {
         "toolCalled": true,
         "criteria": {
@@ -939,7 +938,6 @@
         "can I hire a plumber through you?"
       ],
       "proves": "\"Show me more\" still excludes every product already shown when the turn that showed them has left the recall window. The filler turns retrieve nothing, so the only already-shown ids are the ones now out of reach.",
-      "knownFailing": "The instructions require passing the ids of every product already shown in excludeProductIds, but those ids exist only inside the evicted tool result. A turn stores two messages, so the 20-message recall window holds ten turns. The constraint here is stated twelve turns before the query that must honour it, which puts it outside the window: measured against the mock model, a sentinel stated on the first turn is still in the prompt after ten turns and gone after eleven. Nothing else persists it, so the model cannot recover it. The shopper asks for more and is shown the same page again. This is the clearest case for structured working memory: the id list is exactly the kind of state that must survive independently of the transcript.",
       "expect": {
         "toolCalled": true,
         "criteria": {
