@@ -2,6 +2,7 @@ import type { LanguageModelV4GenerateResult } from '@ai-sdk/provider';
 import { Agent } from '@mastra/core/agent';
 import { createTool } from '@mastra/core/tools';
 import { LibSQLStore } from '@mastra/libsql';
+import type { MemoryConfig } from '@mastra/core/memory';
 import { Memory } from '@mastra/memory';
 import { MockLanguageModelV4 } from 'ai/test';
 import fs from 'node:fs';
@@ -13,7 +14,7 @@ import { resetCatalogCache } from '@/catalog/catalog-cache';
 import { resolveProducts, resolveProductsWithTotals } from '@/catalog/resolve-products';
 import { normalizeProduct } from '@/catalog/normalize';
 import { retrievalCriteriaSchema, type RetrievalCriteria } from '@/catalog/types';
-import { HISTORY_WINDOW_MESSAGES } from './memory';
+import { HISTORY_WINDOW_MESSAGES, shopperStateSchema } from './memory';
 import { KnownToolsOnlyProcessor } from './processors/known-tools-only-processor';
 import {
   resolveProductsOutputSchema,
@@ -73,6 +74,17 @@ afterEach(() => {
 });
 
 function makeMemory(): Memory {
+  return buildMemory({ lastMessages: HISTORY_WINDOW_MESSAGES });
+}
+
+function makeMemoryWithWorkingMemory(): Memory {
+  return buildMemory({
+    lastMessages: HISTORY_WINDOW_MESSAGES,
+    workingMemory: { enabled: true, scope: 'thread', schema: shopperStateSchema },
+  });
+}
+
+function buildMemory(options: MemoryConfig): Memory {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-memory-'));
   temporaryDirectories.push(directory);
 
@@ -81,7 +93,7 @@ function makeMemory(): Memory {
       id: 'test-store',
       url: `file:${path.join(directory, 'memory.db')}`,
     }),
-    options: { lastMessages: HISTORY_WINDOW_MESSAGES },
+    options,
   });
 }
 
@@ -327,18 +339,19 @@ describe('bounded history window', () => {
 
 /**
  * Documents the eviction boundary that the two `*-survives-window-eviction` online
- * scenarios fail against, deterministically and without spending a token.
+ * scenarios failed against, deterministically and without spending a token.
  *
  * The point of the second assertion is that this is NOT data loss. The constraint is
  * still in storage and still renders in the UI; it simply stops being handed to the
  * model. That is why a larger `lastMessages` only moves the cliff rather than removing
  * it, and why the fix is to hold shopper state outside the transcript.
  *
- * When working memory lands, the sentinel should reach the model through that channel
- * and the first assertion here becomes wrong. Replace it with the positive form then —
- * do not widen the window to make it pass.
+ * Working memory has since landed, so the two describes below are the two channels: the
+ * transcript still evicts exactly as it always did — that fact is the reason the feature
+ * exists, so it is asserted unchanged — while working memory carries the same constraint
+ * past the same boundary. The window is still 20 in both.
  */
-describe('constraints stated before the recall window', () => {
+describe('constraints stated before the recall window, via the transcript', () => {
   const TURNS_THAT_FIT_THE_WINDOW = HISTORY_WINDOW_MESSAGES / 2;
   const SENTINEL = 'my budget is fifty dollars';
 
@@ -371,6 +384,77 @@ describe('constraints stated before the recall window', () => {
     });
     expect(JSON.stringify(everyStoredMessage)).toContain(SENTINEL);
   }, 60_000);
+});
+
+/**
+ * The positive half: the same constraint, the same number of turns, the same window,
+ * reaching the model anyway because working memory renders as a system message rather
+ * than a conversational turn.
+ *
+ * `makeModel` is a mock that only ever emits the same `resolveProducts` call, so it will
+ * never invoke `updateWorkingMemory` the way a real model does. State is written directly
+ * instead — what is under test here is whether stored state survives eviction and reaches
+ * the prompt, not whether a mock can be persuaded to call a tool.
+ */
+describe('constraints stated before the recall window, via working memory', () => {
+  const TURNS_THAT_FIT_THE_WINDOW = HISTORY_WINDOW_MESSAGES / 2;
+  const BUDGET_SENTINEL = 50;
+  const SHOWN_ID_SENTINEL = 63;
+
+  it('still reach the model after the transcript has evicted them', async () => {
+    const memory = makeMemoryWithWorkingMemory();
+    const model = makeModel('resolveProducts', ALL_OPTIONALS_NULL);
+    const agent = makeAgent(memory, model, 'resolveProducts', []);
+
+    await agent.generate('my budget is fifty dollars', {
+      memory: { thread: 'working-memory-thread', resource: RESOURCE_ID },
+    });
+    await memory.updateWorkingMemory({
+      threadId: 'working-memory-thread',
+      resourceId: RESOURCE_ID,
+      workingMemory: JSON.stringify({
+        statedMaxPrice: BUDGET_SENTINEL,
+        shownProductIds: [SHOWN_ID_SENTINEL],
+        excludedBrands: [],
+        categoryInterest: null,
+      }),
+    });
+
+    for (let turn = 0; turn <= TURNS_THAT_FIT_THE_WINDOW; turn += 1) {
+      await agent.generate(`filler turn ${turn}`, {
+        memory: { thread: 'working-memory-thread', resource: RESOURCE_ID },
+      });
+    }
+
+    const prompt = lastPrompt(model);
+    const systemText = prompt
+      .filter((message) => message.role === 'system')
+      .map((message) => JSON.stringify(message.content))
+      .join('\n');
+
+    expect(JSON.stringify(prompt)).not.toContain('my budget is fifty dollars');
+    expect(systemText).toContain(`\\"statedMaxPrice\\":${BUDGET_SENTINEL}`);
+    expect(systemText).toContain(`\\"shownProductIds\\":[${SHOWN_ID_SENTINEL}]`);
+  }, 60_000);
+});
+
+/**
+ * The schema sits on the zod-4-hoisted / zod-3-vendored seam that
+ * `src/lib/mastra-zod-interop.test.ts` pins for tools. Mastra converts it with
+ * `~standard.jsonSchema.output(...)`, and a conversion that silently drops fields would
+ * surface as an agent that quietly stops carrying a constraint rather than as a throw.
+ */
+describe('working memory schema conversion', () => {
+  it('reaches Mastra as JSON carrying every shopper-state field', async () => {
+    const template = await makeMemoryWithWorkingMemory().getWorkingMemoryTemplate({});
+
+    expect(template?.format).toBe('json');
+
+    const properties = Object.keys(JSON.parse(String(template?.content)).properties ?? {});
+    expect(properties.sort()).toEqual(
+      ['categoryInterest', 'excludedBrands', 'shownProductIds', 'statedMaxPrice'].sort(),
+    );
+  });
 });
 
 describe('history written by an earlier tool set', () => {

@@ -4,11 +4,18 @@ Twenty-six scenarios in one golden dataset (`scenarios.json`), graded by two run
 answer two different questions.
 
 > [!IMPORTANT]
-> **Two scenarios are expected to fail.** They encode the recall-window limit — diagnosed,
-> architectural, not yet fixed — and they carry a `knownFailing` field that both runners print
-> at the end of a run. A red eval suite is the current correct state. See
-> [Known-failing scenarios](#known-failing-scenarios) before touching them — the one thing
-> not to do is relax an assertion to get green.
+> **No scenario carries a `knownFailing` marker any more.** Every defect the adversarial QA
+> pass found has been fixed, and the recall-window pair was the last to go. Both runners still
+> print the marker at the end of a run, so re-introducing one stays visible. See
+> [Known-failing scenarios](#known-failing-scenarios) for the rule that governs adding one —
+> the one thing not to do is relax an assertion to get green.
+>
+> A green suite is now the expected state, with one caveat worth knowing before you read a red
+> run as rot: three scenarios are **not perfectly reliable** —
+> `pagination-ids-survive-window-eviction` at roughly 8 runs in 10,
+> `off-catalog-flight` at about 2 in 4 (its regex rejects some correct refusals), and
+> `follow-up-cheaper-than-that`, which predates both. None is marked, deliberately; see
+> [State that outlives the recall window](#state-that-outlives-the-recall-window).
 
 | Runner                                     | Question it answers                             | Model calls  | Cost   |
 | ------------------------------------------ | ----------------------------------------------- | ------------ | ------ |
@@ -100,8 +107,8 @@ bounded to 6 agent steps so one runaway tool loop cannot blow the budget between
 | `zero-sentinel-empties-catalog`          | category browsing works; zero upper bounds ignored        | yes     | yes    |
 | `gendered-slug-unrequested-narrowing`    | ambiguous product type omits the slug instead of guessing | no      | yes    |
 | `gendered-slug-false-scarcity`           | `totalMatchedWithoutCategoryFilter` — no false scarcity   | partial | yes    |
-| `budget-survives-window-eviction`        | **known failing** — budget dropped once out of window     | no      | yes    |
-| `pagination-ids-survive-window-eviction` | **known failing** — shown ids lost, same page re-served   | no      | yes    |
+| `budget-survives-window-eviction`        | budget survives eviction via working memory               | no      | yes    |
+| `pagination-ids-survive-window-eviction` | shown ids survive eviction — _flaky, ~8/10_               | no      | yes    |
 
 Three scenarios are regression tests for failures actually observed in live runs and fixed
 by prompt changes:
@@ -306,28 +313,25 @@ covered: `upstream-zero-reversed-tokens` asserts the first two directly,
 
 ## Known-failing scenarios
 
-Two scenarios run **red on purpose**. Both encode the recall-window limit described in
-[State that outlives the recall window](#state-that-outlives-the-recall-window); every defect
-found by the adversarial QA pass (32 probes against the live catalog) has now been fixed. They
-are asserted exactly like every other scenario. Each carries a
+**Nothing runs red on purpose any more.** The mechanism stays: a scenario may carry a
 `knownFailing` string, which both runners print at the end of a run so an intentional red is
-never mistakable for rot.
+never mistakable for rot. There is currently nothing to print.
 
-All seven of the original QA scenarios have since been fixed: two plus half of a third by the
+All seven of the original QA scenarios have been fixed: two plus half of a third by the
 retrieval counts (see [What the retrieval counts fixed](#what-the-retrieval-counts-fixed)),
 `zero-sentinel-empties-catalog` by making category browsing legal,
 `gendered-slug-unrequested-narrowing` by the ambiguous-slug rule, and the three
-`false-decline-*` scenarios by deleting the rule that told the model not to search. What
-remains is the recall-window pair alone — a defect of the agent's memory, not its judgement.
+`false-decline-*` scenarios by deleting the rule that told the model not to search. The
+recall-window pair — a defect of the agent's memory rather than its judgement — was the last,
+cleared by working memory; see
+[State that outlives the recall window](#state-that-outlives-the-recall-window).
 
 **The rule: clear one by fixing the agent, then delete its `knownFailing` field. Never by
 weakening the assertion.** An eval tuned until it agrees with current behaviour tests
 nothing — the same principle that kept `ambiguous-cheap-and-cool` failing through YAN-38.
 
-| Scenario                                 | Defect                                                        | Where the fix belongs        |
-| ---------------------------------------- | ------------------------------------------------------------- | ---------------------------- |
-| `budget-survives-window-eviction`        | a $50 budget stated 12 turns back no longer reaches the model | `memory.ts` — working memory |
-| `pagination-ids-survive-window-eviction` | "show me more" re-serves page one; the shown ids were evicted | `memory.ts` — working memory |
+The table that listed them is gone with the last entry. What each defect was, and what closed
+it, is recorded in the sections below.
 
 Four notes on reading them:
 
@@ -393,11 +397,12 @@ The rule of thumb this leaves: **reach for structure when the right answer is im
 invisible, and for prose when it is merely unchosen.** Checking which one you have first is
 cheaper than discovering it after a refactor.
 
-**The two eviction scenarios are a different class from the other five.** Findings 1–4 are
-defects in what the model does with the information it has. These two are defects in what
-information it is given at all, and no wording in `instructions.ts` can clear them — the
-constraint is not in the prompt to be reasoned about. They are the only known-failing
-scenarios whose fix is architectural rather than a prompt or catalog change.
+**The two eviction scenarios were a different class from the four findings above.** Findings
+1–4 are defects in what the model does with the information it has. Those two were defects in
+what information it was given at all, which is why no wording in `instructions.ts` could clear
+them — the constraint was not in the prompt to be reasoned about. They were the only
+known-failing scenarios whose fix was architectural rather than a prompt or catalog change,
+and they were the last two to go; see below.
 
 ## State that outlives the recall window
 
@@ -440,6 +445,89 @@ prompt, absent from `recall()`, and still present in storage when read with a wi
 still renders in the UI. Raising `lastMessages` moves the cliff further out and makes every
 turn more expensive; it does not remove the cliff. The state a shopper expects to persist —
 budget, excluded brands, products already seen — has to be held outside the transcript.
+
+### What fixed them
+
+Schema working memory on `commerceMemory`, holding four fields — `statedMaxPrice`,
+`shownProductIds`, `excludedBrands`, `categoryInterest`. Mastra renders that block as a
+**system** message rather than a conversational turn, so `lastMessages` never evicts it and
+the constraint reaches the model on turn 13 exactly as it did on turn 1.
+`HISTORY_WINDOW_MESSAGES` is still 20.
+
+`scope` is `'thread'`, not the `'resource'` default, and the default would have been actively
+harmful here: this suite gives every scenario a fresh thread but a single shared
+`EVAL_RESOURCE_ID`, so resource scope would have leaked one scenario's budget and shown ids
+into the other 25. The app has the same shape — one `LOCAL_RESOURCE_ID` for every
+conversation — where it would carry one shopping session's budget into the next.
+
+Two things were needed beyond enabling the feature:
+
+**`shownProductIds` is written by the tool, not the model.** Every other field is something
+the shopper said, which the model transcribes reliably. This one is six integers copied out of
+a tool result and reproduced exactly on every later turn — left to the model it recorded them
+on roughly 1 run in 3, and a near-miss is invisible, because a wrong id silently fails to
+exclude the product it names. `resolveProductsTool` now appends the ids it just returned via
+`recordShownProducts`, and the prompt tells the model to read that field and never write it.
+
+**`KnownToolsOnlyProcessor` had to learn the working-memory tool name.** It drops any tool
+call not in its allowlist along with its result, and it was constructed from
+`Object.keys(COMMERCE_TOOLS)` alone. Left unfixed, the model's own `updateWorkingMemory` call
+would vanish from the prompt at the next step of the same turn, so it would see no evidence it
+had stored anything and call again until the step budget ran out.
+
+### The ablation for the working-memory prompt changes
+
+Enabling the feature injects Mastra's own ~1.5 KB block on every turn, which is not optional.
+What _was_ optional is how much of `instructions.ts` had to change alongside it. Three runs
+per variant, over the two eviction scenarios:
+
+| Variant                                         | `budget-…-eviction` | `pagination-…-eviction` |
+| ----------------------------------------------- | ------------------- | ----------------------- |
+| Expanded "show me more" bullet + two paragraphs | 3/3                 | 3/3                     |
+| **Expanded bullet only (kept)**                 | 3/3                 | **3/3**                 |
+| Original one-line bullet, no paragraphs         | 3/3                 | **2/3**                 |
+
+The two paragraphs — spelling out that a recorded budget or brand stays in force until the
+shopper changes it — were **cut**. Mastra's injected block already tells the model to store
+and read state, and repeating that in our own words bought nothing. What it cannot know is
+which recorded field feeds which tool argument, and that is exactly what the surviving bullet
+says. Same pattern as the counts ablation above: prose earns its place only where the
+surrounding structure cannot speak for itself.
+
+Read those counts with the flakiness noted below in mind: at three runs per variant, against
+a scenario that passes about 8 times in 10 once fixed, a 3/3 and a 2/3 are weak evidence
+individually. They are recorded because they agree with the mechanism — the surviving bullet
+is the only text that says which field feeds which argument — not because three runs settle
+it on their own.
+
+One line was also added to the tool description, which is the other place the model reads
+while it builds the call. Before it, the model would reach for `excludeProductIds` and send it
+**empty** — the right field, unpopulated. That failure is what the line names explicitly.
+
+Measured on the rebase onto `ebdd443`, where the five QA scenarios were already fixed: the
+suite goes from 24/26 to **25/26**, both eviction scenarios passing. The one failure was
+`off-catalog-flight`, which is **not** caused by this work — checked out at `ebdd443` with
+none of these changes present, it fails 2 runs in 4 on its own. Deleting the no-search rule in
+#22 changed how the model phrases a decline, and the scenario's regex does not cover all the
+good ones: "I can't help book Tokyo travel here" is a correct refusal that matches none of the
+listed patterns, because `can't (carry|sell|stock|offer|book)` does not allow for the word
+"help" in between. Widening that regex belongs to whoever owns that scenario, not here — but
+it should be widened, since the assertion currently fails valid behaviour.
+
+> **`pagination-ids-survive-window-eviction` is fixed but not yet reliable — roughly 8 runs
+> in 10.** Both `knownFailing` markers were removed anyway, and the distinction matters.
+> The defect they described is genuinely gone: the ids were previously _not in the prompt at
+> all_, so the scenario could not pass, and they are now provably there on every turn — the
+> thread's working memory reads `{"shownProductIds":[63,73,66,54,51,70],…}` in runs that fail
+> as well as runs that pass. What remains is the model occasionally building the call without
+> `excludeProductIds` despite holding the ids: an ordinary planning miss of the same kind as
+> `follow-up-cheaper-than-that`, not a missing-information defect.
+>
+> It stays unmarked for the reason that one does. `knownFailing` is for diagnosed, unfixed
+> defects with a known home for the fix; using it for a residual flake would launder an
+> undiagnosed failure into an accepted one, and would also assert something false — that the
+> recall-window limit is still unaddressed. `budget-survives-window-eviction` passed every
+> run observed.
 
 ## What the retrieval counts fixed
 
