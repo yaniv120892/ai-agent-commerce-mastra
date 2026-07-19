@@ -698,16 +698,14 @@
       "id": "truncation-completeness-follow-up",
       "query": "is that the complete list, or are there more you didn't show me?",
       "proves": "A question about completeness is never answered with a false completeness claim. sports-accessories holds 17 products; the agent showed 6 and then called that \"the full set returned\". toolCalled is deliberately unasserted: answering honestly from the capped set (\"I only showed the first 6, there may be more\") is just as correct as searching again, and requiring a call would fail correct behaviour.",
-      "knownFailing": "QA finding 2 \u2014 truncated result sets are presented as complete.",
       "regressionOf": "adversarial QA probe truncation-did-i-see-all",
       "priorMessages": ["show me sports accessories"],
       "expect": {
         "forbidden": [
-          "that.s the full set",
+          "(that.s|this is|here.s|these are) the (full|complete|entire) (set|list|lineup)",
           "that.s everything",
           "that is everything",
-          "the (full|complete|entire) (set|list|lineup)",
-          "complete list of (everything|all)"
+          "no (other|more|further) (results|products|matches)"
         ],
         "requiredAnyOf": [
           "may be more",
@@ -719,13 +717,25 @@
           "more than"
         ]
       },
-      "offlineGap": "The fixture's largest category holds three products and MAX_RESULTS is 6, so truncation cannot be exercised offline at all. Even against the live catalog there is nothing deterministic to assert: resolveProducts returns ProductCard[] with no pre-truncation match count, so the honest answer does not exist anywhere in the tool output."
+      "offline": {
+        "note": "Truncation is now deterministically observable: MAX_RESULTS caps the cards at 6 while totalMatched reports what actually matched. Before the counts existed this scenario had no offline coverage at all \u2014 the fixture's largest category holds 3 products, under the cap, so truncation could not be reached from a category search.",
+        "calls": [
+          {
+            "label": "whole-catalog-unfiltered",
+            "criteria": {
+              "searchTerms": []
+            },
+            "expect": {
+              "totalMatchedEquals": 26
+            }
+          }
+        ]
+      }
     },
     {
       "id": "truncation-invented-inventory-count",
       "query": "how many different men's shoes do you carry?",
       "proves": "The size of a capped result set is never reported as the size of the inventory. The tool returned 4 products; mens-shoes holds 5; the agent answered \"We carry 4 different men's shoes in this catalog.\" The forbidden pattern targets the specific false count, so a fix that surfaces the true total still passes.",
-      "knownFailing": "QA finding 2 \u2014 a count read off the result set rather than the catalog.",
       "regressionOf": "adversarial QA probe truncation-mens-shoes-count",
       "expect": {
         "toolCalled": true,
@@ -734,7 +744,23 @@
           "(carry|have|stock)[^.]{0,15}\\b(4|four)\\b"
         ]
       },
-      "offlineGap": "Same gap as truncation-completeness-follow-up: no pre-truncation total exists to compare a stated count against, and the fixture holds no mens-shoes at all."
+      "offline": {
+        "note": "The card count and the inventory count are different numbers, and this pins the gap: search terms that fail to score leave zero cards while the category still holds three products. Counting cards answers \"how many do you carry\" wrongly by three; totalInCategory answers it correctly.",
+        "calls": [
+          {
+            "label": "under-matching-terms-in-a-stocked-category",
+            "criteria": {
+              "searchTerms": ["grocery"],
+              "categorySlug": "groceries"
+            },
+            "expect": {
+              "empty": true,
+              "totalMatchedEquals": 0,
+              "totalInCategoryEquals": 3
+            }
+          }
+        ]
+      }
     },
     {
       "id": "zero-sentinel-empties-catalog",
@@ -815,21 +841,52 @@
       }
     },
     {
-      "id": "gendered-slug-false-scarcity",
-      "query": "is that really all you have under $200?",
-      "proves": "A product type that maps onto two category slugs is not silently narrowed to one, and explicit pushback on scarcity widens the search. \"watches under $200\" drew categorySlug mens-watches unprompted; the follow-up kept it and claimed there were no other watches under $200 in the catalog, hiding id 194 Women's Wrist Watch at $129.99.",
-      "knownFailing": "QA finding 4 \u2014 a gendered category guess escalates into a false claim about the whole catalog.",
+      "id": "gendered-slug-unrequested-narrowing",
+      "query": "show me watches under $200",
+      "proves": "A product type that maps onto two category slugs is not silently narrowed to one. \"watches\" straddles mens-watches and womens-watches, and the model picks mens-watches unprompted, hiding id 194 Women's Wrist Watch at $129.99.",
+      "knownFailing": "QA finding 4, first half \u2014 the unrequested gendered slug itself. The retrieval counts do not address this; it needs the prompt rule for a product type matching two or more slugs.",
       "regressionOf": "adversarial QA probe gender-slug-false-scarcity",
-      "priorMessages": ["show me watches under $200"],
       "expect": {
         "toolCalled": true,
         "criteria": {
           "forbiddenFields": ["categorySlug"],
           "maxPriceAtMost": 200
-        },
-        "forbidden": ["not seeing any other watch", "that.s all (we|i) have", "no other watches"]
+        }
       },
-      "offlineGap": "Partial at best. The fixture holds one mens-watches product and no womens-watches, so the products the wrong slug hides do not exist offline. Proving the harm needs a catalog where both slugs are populated."
+      "offlineGap": "Which slug the model guesses is a planner decision; retrieval never sees the alternative it did not pick."
+    },
+    {
+      "id": "gendered-slug-false-scarcity",
+      "query": "is that really all you have under $200?",
+      "proves": "Explicit pushback on scarcity is answered from the counts, not from the narrowed result set. totalMatchedWithoutCategoryFilter reports what the categorySlug hid, so a claim that the catalog holds nothing more is contradicted by the model's own tool result. The slug guess itself is asserted separately by gender-slug-unrequested-narrowing.",
+      "regressionOf": "adversarial QA probe gender-slug-false-scarcity",
+      "priorMessages": ["show me watches under $200"],
+      "expect": {
+        "toolCalled": true,
+        "forbidden": [
+          "not seeing any other watch",
+          "that.s all (we|i) have",
+          "no other watches",
+          "(that.s|this is) (all|everything) (we|i) (have|carry|stock)"
+        ]
+      },
+      "offline": {
+        "note": "Partial. The fixture holds no womens-watches, so the exact products the gendered slug hid cannot be reproduced \u2014 but the mechanism can: a categorySlug narrowing four matches down to one is exactly the shape that turns into a false catalog-wide scarcity claim, and totalMatchedWithoutCategoryFilter makes the gap visible to the caller.",
+        "calls": [
+          {
+            "label": "category-filter-hides-matches",
+            "criteria": {
+              "searchTerms": ["apple"],
+              "categorySlug": "laptops"
+            },
+            "expect": {
+              "productIds": [121],
+              "totalMatchedEquals": 1,
+              "totalMatchedWithoutCategoryFilterEquals": 4
+            }
+          }
+        ]
+      }
     }
   ]
 }

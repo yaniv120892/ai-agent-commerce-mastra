@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { resolveProducts } from '@/catalog/resolve-products';
-import type { ProductCard, RetrievalCriteria } from '@/catalog/types';
+import { resolveProductsWithTotals } from '@/catalog/resolve-products';
+import type { ProductCard, RetrievalCriteria, RetrievalResult } from '@/catalog/types';
 import { formatOfflineReport } from './report';
 import { offlineCatalog, scenarios, scenariosWithOfflineCoverage } from './scenarios';
 import type { OfflineCall, OfflineCallExpectation, OfflineCheck } from './types';
@@ -43,7 +43,7 @@ describe('offline eval — deterministic retrieval over the fixture catalog', ()
 
     if (offline.expect?.laterCallReturnsFewer === true) {
       it('narrows the result set with each successive call', () => {
-        const counts = resultsByCall.map((results) => results.length);
+        const counts = resultsByCall.map((result) => result.products.length);
         for (let index = 1; index < counts.length; index += 1) {
           expect(counts[index], `${scenario.id}: call ${index} did not narrow`).toBeLessThan(
             counts[index - 1],
@@ -58,12 +58,12 @@ afterAll(() => {
   process.stdout.write(formatOfflineReport());
 });
 
-function runCalls(calls: OfflineCall[]): ProductCard[][] {
-  const resultsByCall: ProductCard[][] = [];
+function runCalls(calls: OfflineCall[]): RetrievalResult[] {
+  const resultsByCall: RetrievalResult[] = [];
   for (const call of calls) {
-    const previousResults = resultsByCall[resultsByCall.length - 1] ?? [];
-    const criteria = withCarriedExclusions(call, previousResults);
-    resultsByCall.push(resolveProducts(criteria, offlineCatalog));
+    const previousProducts = resultsByCall[resultsByCall.length - 1]?.products ?? [];
+    const criteria = withCarriedExclusions(call, previousProducts);
+    resultsByCall.push(resolveProductsWithTotals(criteria, offlineCatalog));
   }
 
   return resultsByCall;
@@ -82,13 +82,14 @@ function withCarriedExclusions(call: OfflineCall, previous: ProductCard[]): Retr
 
 function assertCallExpectation(
   expectation: OfflineCallExpectation | undefined,
-  results: ProductCard[],
+  result: RetrievalResult,
   label: string,
 ): void {
   if (expectation === undefined) {
     return;
   }
 
+  const results = result.products;
   const ids = results.map((product) => product.id);
 
   if (expectation.productIds !== undefined) {
@@ -132,7 +133,31 @@ function assertCallExpectation(
     ).toEqual([]);
   }
 
+  assertRetrievalTotals(expectation, result, label);
   assertProductFacts(expectation, results, label);
+}
+
+// The counts are what let a caller tell a complete list from the first six of many, so an
+// eval that pins result sets without pinning them leaves the truncation gap unwatched.
+function assertRetrievalTotals(
+  expectation: OfflineCallExpectation,
+  result: RetrievalResult,
+  label: string,
+): void {
+  if (expectation.totalMatchedEquals !== undefined) {
+    expect(result.totalMatched, `${label}: totalMatched`).toBe(expectation.totalMatchedEquals);
+  }
+  if (expectation.totalMatchedWithoutCategoryFilterEquals !== undefined) {
+    expect(
+      result.totalMatchedWithoutCategoryFilter,
+      `${label}: totalMatchedWithoutCategoryFilter`,
+    ).toBe(expectation.totalMatchedWithoutCategoryFilterEquals);
+  }
+  if (expectation.totalInCategoryEquals !== undefined) {
+    expect(result.totalInCategory, `${label}: totalInCategory`).toBe(
+      expectation.totalInCategoryEquals,
+    );
+  }
 }
 
 function assertProductFacts(
@@ -165,11 +190,11 @@ function assertProductFacts(
   }
 }
 
-function collectDuplicateIds(resultsByCall: ProductCard[][]): number[] {
+function collectDuplicateIds(resultsByCall: RetrievalResult[]): number[] {
   const seen = new Set<number>();
   const duplicates = new Set<number>();
-  for (const results of resultsByCall) {
-    for (const product of results) {
+  for (const result of resultsByCall) {
+    for (const product of result.products) {
       if (seen.has(product.id)) {
         duplicates.add(product.id);
       }
