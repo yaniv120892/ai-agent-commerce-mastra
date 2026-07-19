@@ -274,11 +274,17 @@ The schema fix and three new prompt paragraphs landed in the same commit, so 15/
 credited both and nobody knew which half was doing the work. A follow-up pass settled it.
 
 **The contract moved into code.** "If `searchTerms` is empty, `categorySlug` must be
-omitted" was a validation rule written as prose in two places and enforced nowhere. It is
-now a `.superRefine` on `resolveProductsInputSchema`. Mastra validates tool input inside
+omitted" was a validation rule written as prose in two places and enforced nowhere. It became
+a `.superRefine` on `resolveProductsInputSchema`. Mastra validates tool input inside
 `execute` and returns the failure as a tool result rather than throwing, so the model reads
 a directed correction and calls again. Verified: the refine leaves the emitted JSON schema
 byte-identical, so the nullable-enum fix is untouched.
+
+> ⚠️ **This refine was later removed**, and it is the one design decision in this project that
+> got reversed on evidence. It made _browsing a category_ unexpressible, so "show me all your
+> groceries" returned nothing against 27 grocery products — the model hit the rejection, reached
+> for `maxPrice: 0` as a neutral repair, and emptied the catalog. See "Let a category be browsed"
+> below for the removal, the 12/12 risk measurement, and where the protection went instead.
 
 **Two coverage gaps were closed first**, because ablating prose the suite does not watch
 proves nothing. There was no whole-catalog superlative scenario at all — the failure the
