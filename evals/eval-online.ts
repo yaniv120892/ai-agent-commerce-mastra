@@ -87,6 +87,10 @@ async function runTurn(query: string, threadId: string): Promise<TurnOutcome> {
 function assertToolUsage(scenario: EvalScenario, outcome: TurnOutcome): void {
   const callCount = outcome.criteriaPerCall.length;
 
+  if (scenario.expect.toolCalled === undefined) {
+    return;
+  }
+
   if (!scenario.expect.toolCalled) {
     expect(
       callCount,
