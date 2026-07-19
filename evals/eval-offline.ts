@@ -147,6 +147,11 @@ function assertRetrievalTotals(
   if (expectation.totalMatchedEquals !== undefined) {
     expect(result.totalMatched, `${label}: totalMatched`).toBe(expectation.totalMatchedEquals);
   }
+  if (expectation.remainingAfterThisPageEquals !== undefined) {
+    expect(result.remainingAfterThisPage, `${label}: remainingAfterThisPage`).toBe(
+      expectation.remainingAfterThisPageEquals,
+    );
+  }
   if (expectation.totalMatchedWithoutCategoryFilterEquals !== undefined) {
     expect(
       result.totalMatchedWithoutCategoryFilter,

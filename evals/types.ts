@@ -57,6 +57,7 @@ const offlineCallExpectationSchema = z.object({
   everyPriceAtMost: z.number().optional(),
   everyRatingAtLeast: z.number().optional(),
   totalMatchedEquals: z.number().optional(),
+  remainingAfterThisPageEquals: z.number().optional(),
   totalMatchedWithoutCategoryFilterEquals: z.number().optional(),
   totalInCategoryEquals: z.number().optional(),
   productFacts: z
