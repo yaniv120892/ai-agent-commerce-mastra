@@ -765,8 +765,7 @@
     {
       "id": "zero-sentinel-empties-catalog",
       "query": "list every grocery item you stock",
-      "proves": "A broad category request returns products. Today it returns none: the first call trips the searchTerms/categorySlug refine, the model repairs by filling every optional numeric field with a zero sentinel, and maxPrice 0 survives into the hard filters and eliminates all 27 groceries.",
-      "knownFailing": "QA finding 3 \u2014 a schema-validation retry poisons the call with zero sentinels.",
+      "proves": "A broad category request returns products. It used to return none: empty searchTerms with a categorySlug was rejected, the model repaired by filling every optional numeric field with a zero sentinel, and maxPrice 0 survived into the hard filters and eliminated all 27 groceries. Browsing a category is now legal, and a zero upper bound is ignored rather than treated as a real constraint.",
       "regressionOf": "adversarial QA probe truncation-full-groceries",
       "expect": {
         "toolCalled": true,
@@ -776,7 +775,7 @@
         "forbidden": ["couldn.t pull any", "(no|not any) grocer", "don.t have a catalog list"]
       },
       "offline": {
-        "note": "A zero on maxPrice or maxShippingDays is never a real shopper constraint \u2014 nobody asks for products costing at most nothing, or shipping in at most zero days \u2014 yet each one alone empties the category. minReturnDays 0 is included and passes: it is a harmless no-op, which is why the fix must not blanket-strip every zero. Each call isolates one sentinel so a failure names the field. Asserting this at the catalog layer rather than at toRetrievalCriteria is deliberate: the invariant then holds for every caller, not just the tool wrapper that happens to emit sentinels today.",
+        "note": "A zero on maxPrice or maxShippingDays is never a real shopper constraint \u2014 nobody asks for products costing at most nothing, or shipping in at most zero days. minReturnDays 0 is included and passes as a no-op, which is why the guard covers only the upper bounds rather than stripping every zero. Each call isolates one sentinel so a failure names the field. Asserting this at the catalog layer is deliberate: the invariant then holds for every caller, not just the tool wrapper.",
         "calls": [
           {
             "label": "groceries-clean",
