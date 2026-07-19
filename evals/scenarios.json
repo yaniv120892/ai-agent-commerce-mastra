@@ -17,7 +17,7 @@
         }
       },
       "offline": {
-        "note": "All three fixture laptops survive an unfiltered category search.",
+        "note": "All three fixture laptops survive an unfiltered category search. The browse call additionally pins that a result which fit entirely on one page reports remainingAfterThisPage 0 — the number that has to read as \"that is all of them\" rather than as \"there are more\".",
         "calls": [
           {
             "label": "laptops",
@@ -27,6 +27,18 @@
             },
             "expect": {
               "productIds": [121, 122, 123]
+            }
+          },
+          {
+            "label": "browse-the-whole-category-nothing-truncated",
+            "criteria": {
+              "searchTerms": [],
+              "categorySlug": "laptops"
+            },
+            "expect": {
+              "productIds": [121, 122, 123],
+              "totalMatchedEquals": 3,
+              "remainingAfterThisPageEquals": 0
             }
           }
         ]
@@ -394,7 +406,7 @@
         }
       },
       "offline": {
-        "note": "Page two is non-empty and disjoint from page one. Disjointness alone would pass trivially on an empty second page, so both are asserted.",
+        "note": "Page two is non-empty and disjoint from page one. Disjointness alone would pass trivially on an empty second page, so both are asserted. The remainders pin the distinction the model kept getting wrong in prose: on page two totalMatched is 20, but 6 of those 20 are the cards on screen, so only 14 are genuinely unseen.",
         "calls": [
           {
             "label": "page-one",
@@ -403,7 +415,9 @@
               "sort": "rating-desc"
             },
             "expect": {
-              "productIds": [91, 6, 79, 141, 3, 40]
+              "productIds": [91, 6, 79, 141, 3, 40],
+              "totalMatchedEquals": 26,
+              "remainingAfterThisPageEquals": 20
             }
           },
           {
@@ -415,7 +429,9 @@
             "excludeIdsFromPreviousCall": true,
             "expect": {
               "productIds": [155, 23, 122, 172, 20, 80],
-              "nonEmpty": true
+              "nonEmpty": true,
+              "totalMatchedEquals": 20,
+              "remainingAfterThisPageEquals": 14
             }
           }
         ],
@@ -423,6 +439,31 @@
           "callsDisjoint": true
         }
       }
+    },
+    {
+      "id": "pagination-remaining-count-honest",
+      "query": "show me more",
+      "priorMessages": ["show me smartphones"],
+      "proves": "A page-two reply never overstates how much is left. The catalog holds 16 smartphones; 6 were shown, 6 more come back, so 4 remain unseen — but the page-two tool result reads totalMatched 10, and 6 of those 10 are the cards on screen. The observed failure reported all 10 as \"not shown yet\", which is a false statement about inventory. remainingAfterThisPage states the 4 outright instead of leaving the subtraction to the model. CAVEAT: these numbers couple this scenario to the live catalog holding exactly 16 smartphones. Other scenarios already depend on live counts (194 products, 17 sports accessories), so this is consistent with the suite — but if upstream data shifts, this is one of the scenarios that breaks, and the fix is to re-measure the counts, never to loosen the patterns. The forbidden patterns deliberately require an explicit unseen-claim (\"not shown\", \"unseen\") next to the 10 rather than banning the number outright: \"there are 10 matches left in this category, and 4 more beyond this page\" is a true sentence, and a pattern that rejected it would fail correct behaviour. Mentioning 10 without the honest remainder is caught by requiredAnyOf instead.",
+      "regressionOf": "observed page-two reply \"There are 10 more matching smartphones not shown yet\"",
+      "expect": {
+        "toolCalled": true,
+        "criteria": {
+          "requiredFields": ["excludeProductIds"],
+          "excludesPreviouslyShownIds": true
+        },
+        "forbidden": [
+          "\\b(10|ten)\\b[^.]{0,50}(not shown|not yet shown|haven.t shown|didn.t show|unseen|yet to see|still to see)",
+          "(not shown|not yet shown|haven.t shown|didn.t show|unseen)[^.]{0,50}\\b(10|ten)\\b"
+        ],
+        "requiredAnyOf": [
+          "\\b(4|four) more\\b",
+          "\\b(4|four) (remaining|left|unseen)\\b",
+          "next (6|six)",
+          "these (6|six)"
+        ]
+      },
+      "offlineGap": "The count itself is pinned deterministically on show-me-more-pagination, which asserts remainingAfterThisPage on both pages. What only the online half can see is whether the model states that number honestly in prose rather than reporting totalMatched as the unseen remainder — and prose is exactly what the offline runner never produces."
     },
     {
       "id": "brand-exclusion-no-apple",
@@ -732,7 +773,8 @@
               "searchTerms": []
             },
             "expect": {
-              "totalMatchedEquals": 26
+              "totalMatchedEquals": 26,
+              "remainingAfterThisPageEquals": 20
             }
           }
         ]
