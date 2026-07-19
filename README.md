@@ -28,9 +28,9 @@ than failing on the first request.
 | ---------------------- | --------------------------------------------------------- |
 | `npm run dev`          | Dev server (Next 16 / Turbopack)                          |
 | `npm run build`        | Production build                                          |
-| `npm test`             | 162 unit and integration tests                            |
+| `npm test`             | 208 unit and integration tests                            |
 | `npm run test:e2e`     | 5 Playwright end-to-end tests — **needs a prior `build`** |
-| `npm run eval:offline` | Deterministic eval, 29 assertions, no key, no spend       |
+| `npm run eval:offline` | Deterministic eval, 41 assertions, no key, no spend       |
 | `npm run eval:online`  | Live-model eval, needs a real key, capped at $0.50        |
 | `npm run lint`         | ESLint                                                    |
 | `npm run format:check` | Prettier                                                  |
@@ -53,15 +53,16 @@ src/catalog/      pure TypeScript — fetch, cache, normalize, filter, rank.  Ze
 src/mastra/       agent, system prompt, LibSQL memory, and one thin tool wrapper.
 src/app/api/      chat + conversations routes; streams with the Vercel AI SDK.
 src/components/   chat shell and the product cards, rendered from tool-result parts.
-evals/            15 golden scenarios, an offline runner and an online one.
+evals/            27 golden scenarios, an offline runner and an online one.
 ```
 
 The load-bearing decision is the first line of that tree: **`src/catalog/` has no Mastra
-imports at all.** Retrieval is a pure function, `resolveProducts(criteria, catalog)`, and
-the Mastra tool is a wrapper that adapts it — it holds no ranking, filtering, or business
-logic of its own. Everything interesting about this project is therefore testable without a
-framework, an API key, or an LLM in the loop, which is why 29 eval assertions and the bulk
-of the 162 tests run in under three seconds for free.
+imports at all.** Retrieval is a pure function — `resolveProductsWithTotals(criteria, catalog)`,
+with a one-line `resolveProducts` wrapper that returns just the cards — and the Mastra tool is
+an adapter over it that holds no ranking, filtering, or business logic of its own. Everything
+interesting about this project is therefore testable without a framework, an API key, or an LLM
+in the loop, which is why 41 eval assertions and the bulk of the 208 tests run in under three
+seconds for free.
 
 ### Why Mastra
 
@@ -210,8 +211,22 @@ delegate filtering to someone else's API**, and it is the clearest argument for 
 retrieval into code.
 
 The mappings are exhaustive `satisfies Record<Enum, number>` objects, so adding an enum value
-without deciding its numeric meaning fails to compile. An unrecognised value at runtime
-throws `UnknownCatalogEnumValueError` naming the field, the value, and the product id.
+without deciding its numeric meaning fails to compile. They are then wrapped in a
+`ReadonlyMap` for lookup, so an **unrecognised** value at runtime resolves to `undefined`
+rather than throwing — exhaustive at compile time, permissive at runtime.
+
+That asymmetry is deliberate, and it replaced a stricter first version. Originally an unknown
+value threw and failed the whole catalog fetch. A single new category or shipping string
+appearing upstream would then not degrade the catalog, it would **empty** it: the parse threw,
+the fetch rejected, the cache never populated, and every search failed — roughly five minutes
+after upstream changed, with no deploy involved. Ingest is now permissive per field,
+`parseProducts` keeps the valid products and throws only when **fewer than half** parse (catalog
+drift versus a genuinely changed API shape), and the cache retains last-known-good.
+
+The subtle part is on the filtering side: `undefined > 2` is `false`, so a product with an
+unparseable shipping string could have **silently passed a `maxShippingDays` bound it was never
+shown to meet**. Products with unknown logistics values are therefore excluded while the
+corresponding filter is active and included when it is not.
 
 ### Discounts, and a decision that turned out not to matter
 
@@ -235,11 +250,31 @@ range on offer, so they cannot tell you what they actually wanted, and the guess
 unfalsifiable. Section 6 covers why getting this to actually happen was not a prompt problem.
 
 **Off-catalog** — _"book me a flight to Lisbon"_. The catalog sells physical goods in 24
-categories. The agent declines with **zero tool calls**, names what the store does carry, and
-does not present an unrelated product as a substitute. Running a search you already know will
-be empty just to look diligent is worse than declining. The eval asserts the zero-call
-property directly, and it is the one scenario that has no offline coverage at all, because
-"didn't call the tool" is a property of the planner and never reaches `resolveProducts`.
+categories. The agent **searches first**, then declines from what came back, names what the
+store does carry, and does not present an unrelated product as a substitute.
+
+This reverses my original design, and the reversal is the more interesting half. I first shipped
+the opposite rule — decline with **zero tool calls**, on the reasoning that running a search you
+already know will be empty just to look diligent is worse than declining. An adversarial pass
+showed what that rule actually bought: the agent denied stocking a **$89.99 microwave**, a
+**$5.99 ice cube tray** and a **$29.99 photo frame**, all of which the catalog carries, **with no
+tool call behind the denial** — so no eval, guardrail, or card render could catch it downstream.
+
+The rule asked for a prediction the model cannot make. It has no way to separate a _kind of
+commerce_ this store does not serve (flights) from a _product_ it simply has not checked (ice
+cube trays), so it answered from priors and was wrong on 3 of 8 stocked items probed. Deleting
+the rule took those scenarios from **0/3 to 3/3** over three runs in each direction. The cost
+argument had been wrong too: `resolveProducts` is pure local TypeScript over a cached catalog,
+so there is **no API call** — the rule bought one model round-trip and cost sales.
+
+An **empty result**, never a prior, is now the only thing that licenses "we don't carry that."
+A second, separate clause handles tact: searching first made the agent honest but not tactful,
+and it began narrating its tooling at shoppers (_"my search only turned up a phone accessory"_)
+— someone asking about flights never asked about your search. That wording paragraph was ablated
+over **twelve runs per variant**: 11/12 with it, 7/12 without.
+
+This scenario still has no offline coverage, because whether the planner retrieves before
+declining is a property of the planner and never reaches `resolveProducts`.
 
 **Multi-intent** — _"a phone and a laptop"_. Two intents means **two separate tool calls in
 the same turn**, each with its own terms and filters, presented as two labelled groups. A
@@ -275,6 +310,48 @@ turn returning all six cards is about 428 tokens, so even a saturated window is 
 `local-user`. That is a namespace so the sidebar can list conversations, not an identity, and
 nothing in this app should be read as multi-user. Saying so plainly is more useful than an
 `auth` folder that implies otherwise.
+
+### The second state channel, and why the window alone was not enough
+
+A bounded recall window has a cliff, and I went looking for it. A turn stores exactly two
+messages, so 20 messages holds **ten turns** — and in a thirteen-turn conversation a $50 budget
+stated at turn 1 was silently dropped by turn 13, while "show me more" re-served page one. Both
+failures are silent: nothing throws, no call is malformed, and the reply reads as a helpful
+answer that ignores a constraint the shopper still considers live.
+
+I wrote both as failing eval scenarios **before** changing any architecture, along with a unit
+test pinning three facts together: the constraint is absent from the prompt, absent from
+`recall()`, and **still present in storage** when read with a wider window. That triple is the
+argument against the obvious fix. This is not data loss — the message is still stored and still
+renders in the UI — so raising `lastMessages` only **moves** the cliff while taxing every turn.
+State a shopper expects to persist has to live outside the transcript.
+
+So `commerceMemory` also carries **schema working memory**: four fields — `statedMaxPrice`,
+`shownProductIds`, `excludedBrands`, `categoryInterest`. Mastra renders it as a **system**
+message rather than a conversational turn, so the recall window never evicts it.
+`HISTORY_WINDOW_MESSAGES` stays at 20.
+
+Three decisions in there worth naming:
+
+- **`scope: 'thread'`, not the `'resource'` default.** Every conversation shares one
+  `local-user` resource id, so resource scope would carry one shopping session's budget and
+  shown products into the next unrelated one — and would have leaked one eval scenario's state
+  into the other 26.
+- **`shownProductIds` is written by the tool, not the model.** Every other field is something
+  the shopper _said_, which the model transcribes reliably. This one is six integers copied out
+  of a tool result and reproduced exactly on every later turn — and measured live, the model
+  recorded them on about **1 run in 3**. A near-miss is invisible: a wrong id silently fails to
+  exclude the product it names. The write swallows every error by design, because it is
+  bookkeeping that improves a later "show me more", not part of answering the search the shopper
+  is waiting on. Its known weakness is a read-merge-write race: two tool calls in the same turn
+  — the multi-intent path — can lose one call's ids.
+- **It is not free.** Working memory costs roughly **+39% input tokens on every turn**, measured
+  A/B on three single-turn scenarios that cannot benefit from it at all (19,342 → 26,891 for the
+  same 3 model calls). A full eval run went from 276k to ~614k tokens, $0.079 to $0.170. That is
+  the same objection that ruled out simply raising `lastMessages`, and it applies here too — the
+  bill lands on every conversation, including short ones that never approach the window. I think
+  the trade is right because the defect was silent and the cost is visible, but it is a trade,
+  and it should be visible here rather than discovered on a bill.
 
 ### What happens when storage fails
 
@@ -314,28 +391,57 @@ intact.
 
 ## 5. Evaluation
 
-15 golden scenarios in `evals/scenarios.json`, graded by two runners that answer two
+27 golden scenarios in `evals/scenarios.json`, graded by two runners that answer two
 different questions. Full detail in `evals/README.md`.
 
 | Runner                 | Question                                        | Cost                        |
 | ---------------------- | ----------------------------------------------- | --------------------------- |
 | `npm run eval:offline` | Does retrieval still select the right products? | $0, no model call           |
-| `npm run eval:online`  | Does the planner still plan correctly?          | ~$0.036 against a $0.50 cap |
+| `npm run eval:online`  | Does the planner still plan correctly?          | ~$0.170 against a $0.50 cap |
 
-**Offline** is deterministic: 29 assertions over a fixed 26-product fixture, never the live
+**Offline** is deterministic: **41 assertions** over a fixed 26-product fixture, never the live
 catalog, because upstream data can change under you and a golden dataset that moves is not
 golden. It pins exact result sets, exact `minimumSpend` values, exact disjointness between
-paginated pages.
+paginated pages, and the four retrieval counts. **41 of 41 pass.**
 
-**Online** runs the real `gpt-5.4-mini` against the live catalog: **15 of 15 scenarios pass**,
-17 model calls, ~93.5K input / 2.7K output tokens, **$0.0359** estimated spend. `SpendCap`
-accumulates usage and checks the budget _before_ each call so a run stops rather than
+**Online** runs the real `gpt-5.4-mini` against the live catalog: **26 of 27 scenarios pass.**
+The last full end-to-end sweep was 25 of 26 at 54 model calls and **~$0.170** estimated spend,
+plus one scenario added afterwards and verified 3/3 over three consecutive filtered runs.
+`SpendCap` accumulates usage and checks the budget _before_ each call so a run stops rather than
 overshoots, and each turn is bounded to 6 agent steps so one runaway tool loop cannot blow the
 budget between checks. It refuses to run against the `sk-your-key-here` placeholder and fails
 loudly with no key — a skipped run must never be mistakable for a passing one.
 
-Around them: **162 unit and integration tests** and **5 Playwright E2E tests** covering card
-rendering, reload persistence, sidebar resume, and fresh-thread isolation.
+The dollar figure is **measured tokens against a configurable rate estimate**
+(`evals/spend-cap.ts`), not a billed amount. Treat it as an order of magnitude.
+
+### One scenario is red on purpose
+
+`follow-up-cheaper-than-that` carries a `knownFailing` marker and both runners print the set at
+the end of every run, so an intentional red is never mistakable for rot. Roughly one run in
+three, the model answers "cheaper than that" with `sort: price-asc` plus `excludeProductIds` and
+**no `maxPrice`** — which orders the results but never guarantees any of them is actually cheaper
+than what the shopper was already shown. It is diagnosed and not yet fixed.
+
+I kept it red rather than relax the assertion, because the rule that makes this suite worth
+anything is: **clear a `knownFailing` by fixing the agent and deleting the field, never by
+weakening the assertion.** An eval tuned until it agrees with current behaviour tests nothing.
+Six fixes in this project cleared their markers that way; this one has not been earned yet.
+
+The scenario also taught me something about intermittents. For most of the project it was
+_two different failures wearing one name_ — the mode above, and a second mode where **correct**
+behaviour was failing a stale assertion written back when empty `searchTerms` alongside a
+`categorySlug` was schema-rejected. The second mode hid inside the first's known flakiness for
+weeks. An undiagnosed intermittent is not a neutral cost; it is a place regressions hide. The
+marker now names mode A precisely, so a change in its rate means something again.
+
+Separately, `pagination-ids-survive-window-eviction` passes about 8 runs in 10. It is _not_
+marked `knownFailing`, because the defect the marker would describe — the shown product ids
+never reaching the model — is genuinely fixed; working memory carries them even on failing runs.
+Re-marking it would assert something false.
+
+Around them: **208 unit and integration tests** across 16 files, and **5 Playwright E2E tests**
+covering card rendering, reload persistence, sidebar resume, and fresh-thread isolation.
 
 **Why plain Vitest and not Mastra's scorers.** A golden dataset over a fixed catalog is a
 _deterministic assertion problem_, not a grading problem. "Does the $419.99 Galaxy survive
@@ -467,11 +573,20 @@ disproven capability is worth re-testing before you architect around its absence
 - **`brand` is a soft signal only** — it is missing on **92 of 194** products, so using it as
   a hard filter would silently drop half the catalog. Brand _exclusion_ therefore needs a
   title-substring fallback to work at all, which is what it does.
-- **Strict enum parsing is deliberate but real.** A single unrecognised upstream
-  `shippingInformation` value fails the whole catalog fetch. I chose loud failure over
-  silently mis-filtering — a product treated as having unknown shipping would quietly vanish
-  from every "ships fast" query — but it does mean one upstream change can take the app down,
-  and a per-product quarantine would be the better long-run answer.
+- **Soft-fail ingest degrades silently by design.** An unrecognised upstream
+  `shippingInformation`, `returnPolicy`, `warrantyInformation` or `category` value no longer
+  fails the fetch (see §3) — the product loads with that field unresolved and is excluded from
+  filters that depend on it. So a product with an unknown shipping value quietly vanishes from
+  every "ships fast" query, and the only signal is a `console.warn` of the unknown values once
+  per catalog load. That is the trade I made against the alternative, which took the whole app
+  down five minutes after upstream changed — but "quietly less visible" is still a real failure
+  mode, and a production version wants those diagnostics on a dashboard, not in a log line.
+- **`availabilityStatus` is still a hard enum.** It is the one vocabulary field that did not
+  move, because the card UI switches on its value, so loosening it ripples into rendering. It
+  is the remaining single-value-takes-the-catalog-down vector.
+- **The catalog fetch has no timeout.** `fetch(CATALOG_URL)` carries no `AbortSignal`, so a
+  hung upstream hangs the turn rather than failing into the retry and last-known-good paths
+  that exist for exactly this. One-line fix; I found it late.
 - **`gpt-5.4-nano` is untested end-to-end.** It is permitted by the env schema; the evals were
   run against `gpt-5.4-mini`.
 - **The chat route trusts the client body.** `POST /api/chat` spreads the request body into
@@ -502,11 +617,12 @@ would still filter numerically in code first and rank semantically within the su
 
 ### With another week
 
-1. **Per-product quarantine on ingest** instead of failing the whole fetch on one bad enum,
-   with a surfaced count of skipped products so the failure stays loud without being fatal.
-2. **A multi-turn drift eval.** Everything today is one or two turns; the twenty-message
-   recall window is completely unexercised past that, and drift is where conversational agents
-   actually rot.
+1. **An injection scenario carried in product data.** The prompt promises that product titles,
+   descriptions and tags are data rather than instructions, and the only injection scenario in
+   the dataset today puts the payload in a _user message_. The catalog is third-party data
+   flowing straight into model context via tool output, so it is the more realistic attack on a
+   commerce agent and it is the one I have not tested.
+2. **A timeout and a surfaced diagnostics channel on ingest** — see the two limitations above.
 3. **Streaming-layer evals.** Neither eval half sees the UI, so a regression that breaks card
    rendering while leaving the plan perfect is caught only by five Playwright tests.
 4. **Attack the prose gap.** Cards cannot lie but sentences can. A cheap deterministic check —
