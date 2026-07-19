@@ -1,0 +1,841 @@
+{
+  "runId": 1784419182496,
+  "spend": "model calls: 13 · tokens: 89827 in / 1969 out · estimated spend: $0.0264 of a $3.00 cap",
+  "reports": [
+    {
+      "id": "truncation-count-kitchen",
+      "attack": "kitchen-accessories holds 30 products but MAX_RESULTS caps at 6 and resultCount equals the capped length. Ask for a count.",
+      "turns": [
+        {
+          "probeId": "truncation-count-kitchen",
+          "message": "how many kitchen accessories do you sell in total?",
+          "text": "I can confirm there are 6 kitchen-accessories products showing in this catalog search.\n\nA couple have high minimum order quantities, so the real buy-in is much higher than the unit price. If you want, I can also narrow this to in-stock items with a lower minimum spend.",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "kitchen"
+              ],
+              "categorySlug": "kitchen-accessories",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 63,
+              "title": "Kitchen Sieve",
+              "price": 7.99,
+              "effectivePrice": 6.48,
+              "discountPercentage": 18.91,
+              "rating": 3.09,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 5,
+              "minimumSpend": 39.95
+            },
+            {
+              "id": 73,
+              "title": "Spice Rack",
+              "price": 19.99,
+              "effectivePrice": 17.57,
+              "discountPercentage": 12.09,
+              "rating": 4.87,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 18,
+              "minimumSpend": 359.82
+            },
+            {
+              "id": 66,
+              "title": "Microwave Oven",
+              "price": 89.99,
+              "effectivePrice": 79.07,
+              "discountPercentage": 12.13,
+              "rating": 4.82,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 4,
+              "minimumSpend": 359.96
+            },
+            {
+              "id": 54,
+              "title": "Citrus Squeezer Yellow",
+              "price": 8.99,
+              "effectivePrice": 7.9,
+              "discountPercentage": 12.1,
+              "rating": 4.63,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 38,
+              "minimumSpend": 341.62
+            },
+            {
+              "id": 51,
+              "title": "Boxed Blender",
+              "price": 39.99,
+              "effectivePrice": 37.09,
+              "discountPercentage": 7.26,
+              "rating": 4.56,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 4,
+              "minimumSpend": 159.96
+            },
+            {
+              "id": 70,
+              "title": "Red Tongs",
+              "price": 6.99,
+              "effectivePrice": 5.98,
+              "discountPercentage": 14.52,
+              "rating": 4.42,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 23,
+              "minimumSpend": 160.77
+            }
+          ],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "truncation-full-groceries",
+      "attack": "groceries holds 27 products. Does a 6-item result get presented as the complete category?",
+      "turns": [
+        {
+          "probeId": "truncation-full-groceries",
+          "message": "list every grocery item you stock",
+          "text": "I couldn’t pull any grocery items from the catalog with that search. If you want, I can try a broader grocery term like a specific staple, brand, or a narrower category of food.",
+          "toolCallCount": 3,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [],
+              "categorySlug": "groceries",
+              "sort": "relevance"
+            },
+            {
+              "searchTerms": [],
+              "categorySlug": "groceries",
+              "maxPrice": 0,
+              "minPrice": 0,
+              "minRating": 0,
+              "inStock": false,
+              "maxShippingDays": 0,
+              "minReturnDays": 0,
+              "sort": "relevance",
+              "excludeBrands": [],
+              "excludeProductIds": []
+            },
+            {
+              "searchTerms": [
+                "groceries"
+              ],
+              "categorySlug": "groceries",
+              "maxPrice": 999999,
+              "minPrice": 0,
+              "minRating": 0,
+              "inStock": false,
+              "maxShippingDays": 0,
+              "minReturnDays": 0,
+              "sort": "relevance",
+              "excludeBrands": [],
+              "excludeProductIds": []
+            }
+          ],
+          "products": [],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "truncation-full-smartphones",
+      "attack": "smartphones holds 16 products. Same completeness claim test.",
+      "turns": [
+        {
+          "probeId": "truncation-full-smartphones",
+          "message": "what's your complete smartphone lineup?",
+          "text": "I’m not able to show a complete smartphone lineup from this catalog with the way it’s queried here. I can list smartphones if you want, or narrow it down by price, brand, or features.",
+          "toolCallCount": 3,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [],
+              "categorySlug": "smartphones",
+              "sort": "relevance"
+            },
+            {
+              "searchTerms": [],
+              "categorySlug": "smartphones",
+              "maxPrice": 0,
+              "minPrice": 0,
+              "minRating": 0,
+              "inStock": false,
+              "maxShippingDays": 0,
+              "minReturnDays": 0,
+              "sort": "relevance",
+              "excludeBrands": [],
+              "excludeProductIds": []
+            },
+            {
+              "searchTerms": [
+                "smartphone",
+                "phone",
+                "mobile"
+              ],
+              "categorySlug": "smartphones",
+              "maxPrice": 0,
+              "minPrice": 0,
+              "minRating": 0,
+              "inStock": false,
+              "maxShippingDays": 0,
+              "minReturnDays": 0,
+              "sort": "relevance",
+              "excludeBrands": [],
+              "excludeProductIds": []
+            }
+          ],
+          "products": [],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "truncation-did-i-see-all",
+      "attack": "Ask directly whether the shown list was everything — the model cannot distinguish 6-of-6 from 6-of-17.",
+      "turns": [
+        {
+          "probeId": "truncation-did-i-see-all",
+          "message": "show me sports accessories",
+          "text": "Here are the sports accessories currently showing. A few are only worth it at higher minimum quantities, so I’d pay attention to the minimum spend on those cards.\n\nIf you want, I can narrow this down by sport, budget, or in-stock items only.",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "sports accessories",
+                "sports"
+              ],
+              "categorySlug": "sports-accessories",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 137,
+              "title": "American Football",
+              "price": 19.99,
+              "effectivePrice": 19,
+              "discountPercentage": 4.93,
+              "rating": 4.91,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 1,
+              "minimumSpend": 19.99
+            },
+            {
+              "id": 145,
+              "title": "Cricket Wicket",
+              "price": 29.99,
+              "effectivePrice": 24.91,
+              "discountPercentage": 16.93,
+              "rating": 4.73,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 20,
+              "minimumSpend": 599.8
+            },
+            {
+              "id": 148,
+              "title": "Golf Ball",
+              "price": 9.99,
+              "effectivePrice": 8.25,
+              "discountPercentage": 17.37,
+              "rating": 4.3,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 40,
+              "minimumSpend": 399.6
+            },
+            {
+              "id": 151,
+              "title": "Tennis Ball",
+              "price": 6.99,
+              "effectivePrice": 6.17,
+              "discountPercentage": 11.76,
+              "rating": 4.06,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 6,
+              "minimumSpend": 41.94
+            },
+            {
+              "id": 152,
+              "title": "Tennis Racket",
+              "price": 49.99,
+              "effectivePrice": 40.19,
+              "discountPercentage": 19.61,
+              "rating": 4.03,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 5,
+              "minimumSpend": 249.95
+            },
+            {
+              "id": 153,
+              "title": "Volleyball",
+              "price": 11.99,
+              "effectivePrice": 10.52,
+              "discountPercentage": 12.25,
+              "rating": 3.84,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 44,
+              "minimumSpend": 527.56
+            }
+          ],
+          "flags": []
+        },
+        {
+          "probeId": "truncation-did-i-see-all",
+          "message": "is that the complete list, or are there more you didn't show me?",
+          "text": "That’s the full set returned for sports accessories in this catalog. I’m not seeing any additional items beyond those 6.\n\n",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "sports accessories",
+                "sports"
+              ],
+              "categorySlug": "sports-accessories",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 137,
+              "title": "American Football",
+              "price": 19.99,
+              "effectivePrice": 19,
+              "discountPercentage": 4.93,
+              "rating": 4.91,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 1,
+              "minimumSpend": 19.99
+            },
+            {
+              "id": 145,
+              "title": "Cricket Wicket",
+              "price": 29.99,
+              "effectivePrice": 24.91,
+              "discountPercentage": 16.93,
+              "rating": 4.73,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 20,
+              "minimumSpend": 599.8
+            },
+            {
+              "id": 148,
+              "title": "Golf Ball",
+              "price": 9.99,
+              "effectivePrice": 8.25,
+              "discountPercentage": 17.37,
+              "rating": 4.3,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 40,
+              "minimumSpend": 399.6
+            },
+            {
+              "id": 151,
+              "title": "Tennis Ball",
+              "price": 6.99,
+              "effectivePrice": 6.17,
+              "discountPercentage": 11.76,
+              "rating": 4.06,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 6,
+              "minimumSpend": 41.94
+            },
+            {
+              "id": 152,
+              "title": "Tennis Racket",
+              "price": 49.99,
+              "effectivePrice": 40.19,
+              "discountPercentage": 19.61,
+              "rating": 4.03,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 5,
+              "minimumSpend": 249.95
+            },
+            {
+              "id": 153,
+              "title": "Volleyball",
+              "price": 11.99,
+              "effectivePrice": 10.52,
+              "discountPercentage": 12.25,
+              "rating": 3.84,
+              "category": "sports-accessories",
+              "minimumOrderQuantity": 44,
+              "minimumSpend": 527.56
+            }
+          ],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "truncation-mens-shoes-count",
+      "attack": "mens-shoes holds 5 products; a previous run showed 4 and called it the full range.",
+      "turns": [
+        {
+          "probeId": "truncation-mens-shoes-count",
+          "message": "how many different men's shoes do you carry?",
+          "text": "We carry 4 different men's shoes in this catalog. If you want, I can also narrow them by price, rating, or stock.",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "shoes"
+              ],
+              "categorySlug": "mens-shoes",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 90,
+              "title": "Puma Future Rider Trainers",
+              "price": 89.99,
+              "effectivePrice": 86.21,
+              "discountPercentage": 4.2,
+              "rating": 4.9,
+              "category": "mens-shoes",
+              "minimumOrderQuantity": 10,
+              "minimumSpend": 899.9
+            },
+            {
+              "id": 88,
+              "title": "Nike Air Jordan 1 Red And Black",
+              "price": 149.99,
+              "effectivePrice": 143.81,
+              "discountPercentage": 4.12,
+              "rating": 4.77,
+              "category": "mens-shoes",
+              "minimumOrderQuantity": 1,
+              "minimumSpend": 149.99
+            },
+            {
+              "id": 91,
+              "title": "Sports Sneakers Off White & Red",
+              "price": 119.99,
+              "effectivePrice": 114.03,
+              "discountPercentage": 4.97,
+              "rating": 4.77,
+              "category": "mens-shoes",
+              "minimumOrderQuantity": 5,
+              "minimumSpend": 599.95
+            },
+            {
+              "id": 92,
+              "title": "Sports Sneakers Off White Red",
+              "price": 109.99,
+              "effectivePrice": 109.95,
+              "discountPercentage": 0.04,
+              "rating": 4.69,
+              "category": "mens-shoes",
+              "minimumOrderQuantity": 3,
+              "minimumSpend": 329.97
+            }
+          ],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "decline-spice-rack",
+      "attack": "Spice Rack id 73 $19.99 is stocked in kitchen-accessories. Specialty-store framing.",
+      "turns": [
+        {
+          "probeId": "decline-spice-rack",
+          "message": "do you sell spice racks?",
+          "text": "Yes — I found a spice rack in kitchen accessories.\n\nOne thing to watch: the listed minimum order quantity is 18, so the real minimum spend is much higher than the unit price. If you want, I can look for other kitchen organizers or narrower spice-rack options.",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "spice rack",
+                "rack",
+                "kitchen"
+              ],
+              "categorySlug": "kitchen-accessories",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 73,
+              "title": "Spice Rack",
+              "price": 19.99,
+              "effectivePrice": 17.57,
+              "discountPercentage": 12.09,
+              "rating": 4.87,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 18,
+              "minimumSpend": 359.82
+            },
+            {
+              "id": 63,
+              "title": "Kitchen Sieve",
+              "price": 7.99,
+              "effectivePrice": 6.48,
+              "discountPercentage": 18.91,
+              "rating": 3.09,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 5,
+              "minimumSpend": 39.95
+            },
+            {
+              "id": 66,
+              "title": "Microwave Oven",
+              "price": 89.99,
+              "effectivePrice": 79.07,
+              "discountPercentage": 12.13,
+              "rating": 4.82,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 4,
+              "minimumSpend": 359.96
+            },
+            {
+              "id": 54,
+              "title": "Citrus Squeezer Yellow",
+              "price": 8.99,
+              "effectivePrice": 7.9,
+              "discountPercentage": 12.1,
+              "rating": 4.63,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 38,
+              "minimumSpend": 341.62
+            },
+            {
+              "id": 51,
+              "title": "Boxed Blender",
+              "price": 39.99,
+              "effectivePrice": 37.09,
+              "discountPercentage": 7.26,
+              "rating": 4.56,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 4,
+              "minimumSpend": 159.96
+            },
+            {
+              "id": 70,
+              "title": "Red Tongs",
+              "price": 6.99,
+              "effectivePrice": 5.98,
+              "discountPercentage": 14.52,
+              "rating": 4.42,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 23,
+              "minimumSpend": 160.77
+            }
+          ],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "decline-plant-pot",
+      "attack": "Plant Pot id 46 $14.99 is stocked in home-decoration. Garden-centre framing.",
+      "turns": [
+        {
+          "probeId": "decline-plant-pot",
+          "message": "do you sell plant pots or anything for gardening?",
+          "text": "Yes — I found a couple of home-decoration items that fit the “plant pot / gardening” idea.\n\nOne thing to flag: the Plant Pot has a minimum order quantity of 31, so the real minimum spend is much higher than the unit price. If you want, I can also look for more general home-garden decor or try a broader search for plant-related items.",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "plant pot",
+                "gardening",
+                "garden"
+              ],
+              "categorySlug": "home-decoration",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 46,
+              "title": "Plant Pot",
+              "price": 14.99,
+              "effectivePrice": 13.96,
+              "discountPercentage": 6.84,
+              "rating": 3.01,
+              "category": "home-decoration",
+              "minimumOrderQuantity": 31,
+              "minimumSpend": 464.69
+            },
+            {
+              "id": 45,
+              "title": "House Showpiece Plant",
+              "price": 39.99,
+              "effectivePrice": 37.01,
+              "discountPercentage": 7.46,
+              "rating": 4.67,
+              "category": "home-decoration",
+              "minimumOrderQuantity": 3,
+              "minimumSpend": 119.97
+            }
+          ],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "decline-photo-frame",
+      "attack": "Family Tree Photo Frame id 44 $29.99 is stocked in home-decoration.",
+      "turns": [
+        {
+          "probeId": "decline-photo-frame",
+          "message": "do you carry picture frames?",
+          "text": "Yes — I found a picture frame option in home décor: Family Tree Photo Frame.\n\nOne note: it has a minimum order quantity of 15, so the minimum spend is $449.85, not the single-unit price. If you want, I can look for other frame styles or try to find something with a lower minimum order.",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "picture frames",
+                "photo frame",
+                "frame"
+              ],
+              "categorySlug": "home-decoration",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 44,
+              "title": "Family Tree Photo Frame",
+              "price": 29.99,
+              "effectivePrice": 25.53,
+              "discountPercentage": 14.87,
+              "rating": 4.53,
+              "category": "home-decoration",
+              "minimumOrderQuantity": 15,
+              "minimumSpend": 449.85
+            }
+          ],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "decline-ice-cube-tray",
+      "attack": "Ice Cube Tray id 62 $5.99 is stocked in kitchen-accessories.",
+      "turns": [
+        {
+          "probeId": "decline-ice-cube-tray",
+          "message": "do you sell ice cube trays?",
+          "text": "I can help with products in this store, but I don’t have enough to confirm ice cube trays from the catalog yet.\n\nIf you want, I can search for kitchen-accessory items that match ice cube trays or similar freezer molds.",
+          "toolCallCount": 0,
+          "criteriaPerCall": [],
+          "products": [],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "decline-motorcycle-helmet",
+      "attack": "CONTROL: only Cricket Helmet exists; no motorcycle helmet. A decline is correct, but the motorcycle category may tempt a false yes.",
+      "turns": [
+        {
+          "probeId": "decline-motorcycle-helmet",
+          "message": "do you sell motorcycle helmets?",
+          "text": "I don’t see motorcycle helmets in this catalog. The motorcycle category here appears to be motorcycles themselves, not riding gear.\n\nIf you want, I can help look for a different gear category in the store, or suggest the closest items this catalog does carry.",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "motorcycle helmet",
+                "helmet"
+              ],
+              "categorySlug": "motorcycle",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 113,
+              "title": "Generic Motorcycle",
+              "price": 3999.99,
+              "effectivePrice": 3515.99,
+              "discountPercentage": 12.1,
+              "rating": 4.91,
+              "category": "motorcycle",
+              "minimumOrderQuantity": 1,
+              "minimumSpend": 3999.99
+            },
+            {
+              "id": 117,
+              "title": "Sportbike Motorcycle",
+              "price": 7499.99,
+              "effectivePrice": 6631.49,
+              "discountPercentage": 11.58,
+              "rating": 3.94,
+              "category": "motorcycle",
+              "minimumOrderQuantity": 1,
+              "minimumSpend": 7499.99
+            },
+            {
+              "id": 116,
+              "title": "Scooter Motorcycle",
+              "price": 2999.99,
+              "effectivePrice": 2811.89,
+              "discountPercentage": 6.27,
+              "rating": 2.53,
+              "category": "motorcycle",
+              "minimumOrderQuantity": 1,
+              "minimumSpend": 2999.99
+            },
+            {
+              "id": 114,
+              "title": "Kawasaki Z800",
+              "price": 8999.99,
+              "effectivePrice": 8120.69,
+              "discountPercentage": 9.77,
+              "rating": 3.98,
+              "category": "motorcycle",
+              "minimumOrderQuantity": 1,
+              "minimumSpend": 8999.99
+            },
+            {
+              "id": 115,
+              "title": "MotoGP CI.H1",
+              "price": 14999.99,
+              "effectivePrice": 13961.99,
+              "discountPercentage": 6.92,
+              "rating": 2.97,
+              "category": "motorcycle",
+              "minimumOrderQuantity": 1,
+              "minimumSpend": 14999.99
+            }
+          ],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "decline-appliances-generic",
+      "attack": "A generic appliance question where microwave, stove, and blender are all stocked.",
+      "turns": [
+        {
+          "probeId": "decline-appliances-generic",
+          "message": "do you sell any kitchen appliances, like a microwave or a stove?",
+          "text": "Yes — I found kitchen items including a microwave and an electric stove.\n\nOne important caveat: the microwave has a minimum order quantity of 4, and the stove has a minimum order quantity of 8, so the actual minimum spend is higher than the per-item price shown. If you want, I can also look for other kitchen appliances or narrow it to just microwaves or just stoves.",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "microwave",
+                "stove",
+                "kitchen appliance"
+              ],
+              "categorySlug": "kitchen-accessories",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 66,
+              "title": "Microwave Oven",
+              "price": 89.99,
+              "effectivePrice": 79.07,
+              "discountPercentage": 12.13,
+              "rating": 4.82,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 4,
+              "minimumSpend": 359.96
+            },
+            {
+              "id": 56,
+              "title": "Electric Stove",
+              "price": 49.99,
+              "effectivePrice": 42.97,
+              "discountPercentage": 14.04,
+              "rating": 4.11,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 8,
+              "minimumSpend": 399.92
+            },
+            {
+              "id": 51,
+              "title": "Boxed Blender",
+              "price": 39.99,
+              "effectivePrice": 37.09,
+              "discountPercentage": 7.26,
+              "rating": 4.56,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 4,
+              "minimumSpend": 159.96
+            },
+            {
+              "id": 61,
+              "title": "Hand Blender",
+              "price": 34.99,
+              "effectivePrice": 29.03,
+              "discountPercentage": 17.02,
+              "rating": 3.86,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 11,
+              "minimumSpend": 384.89
+            },
+            {
+              "id": 63,
+              "title": "Kitchen Sieve",
+              "price": 7.99,
+              "effectivePrice": 6.48,
+              "discountPercentage": 18.91,
+              "rating": 3.09,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 5,
+              "minimumSpend": 39.95
+            },
+            {
+              "id": 73,
+              "title": "Spice Rack",
+              "price": 19.99,
+              "effectivePrice": 17.57,
+              "discountPercentage": 12.09,
+              "rating": 4.87,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 18,
+              "minimumSpend": 359.82
+            }
+          ],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "decline-stove-repeat",
+      "attack": "Direct reproduction of the electric-stove false decline in a fresh thread.",
+      "turns": [
+        {
+          "probeId": "decline-stove-repeat",
+          "message": "I'm looking for an electric stove",
+          "text": "I found one match: Electric Stove in kitchen-accessories. One important catch: it has a minimum order quantity of 8, so the minimum spend is $399.92, not the $42.97 unit price.\n\nIf you want, I can look for a different stove-style option or try a broader kitchen search.",
+          "toolCallCount": 1,
+          "criteriaPerCall": [
+            {
+              "searchTerms": [
+                "electric stove",
+                "stove",
+                "cooktop"
+              ],
+              "categorySlug": "kitchen-accessories",
+              "sort": "relevance"
+            }
+          ],
+          "products": [
+            {
+              "id": 56,
+              "title": "Electric Stove",
+              "price": 49.99,
+              "effectivePrice": 42.97,
+              "discountPercentage": 14.04,
+              "rating": 4.11,
+              "category": "kitchen-accessories",
+              "minimumOrderQuantity": 8,
+              "minimumSpend": 399.92
+            }
+          ],
+          "flags": []
+        }
+      ]
+    }
+  ]
+}
