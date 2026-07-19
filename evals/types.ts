@@ -30,7 +30,10 @@ const criteriaExpectationSchema = z.object({
 });
 
 const scenarioExpectationSchema = z.object({
-  toolCalled: z.boolean(),
+  // Omitted where either answer is legitimate — a question about a previous result set can
+  // be answered honestly from that set or by searching again, and pinning it either way
+  // would assert a preference the scenario does not actually hold.
+  toolCalled: z.boolean().optional(),
   toolCallCount: z.number().optional(),
   criteria: criteriaExpectationSchema.optional(),
   criteriaPerCall: criteriaExpectationSchema.array().optional(),
@@ -87,6 +90,11 @@ export const evalScenarioSchema = z.object({
   query: z.string(),
   proves: z.string(),
   regressionOf: z.string().optional(),
+  // Reporting only — a scenario carrying this is still asserted exactly like the rest.
+  // It records a failure that has been diagnosed but not yet fixed, so a red run stays
+  // legible instead of looking like rot. Delete the field when the fix lands; never
+  // relax the assertion to clear it.
+  knownFailing: z.string().optional(),
   priorMessages: z.string().array().optional(),
   expect: scenarioExpectationSchema,
   offline: offlineCheckSchema.optional(),

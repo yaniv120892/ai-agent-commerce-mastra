@@ -1,7 +1,14 @@
 # Evaluation suite
 
-Sixteen scenarios in one golden dataset (`scenarios.json`), graded by two runners that
+Twenty-three scenarios in one golden dataset (`scenarios.json`), graded by two runners that
 answer two different questions.
+
+> [!IMPORTANT]
+> **Seven scenarios are expected to fail.** They encode defects found by adversarial QA and
+> diagnosed but not yet fixed, and they carry a `knownFailing` field that both runners print
+> at the end of a run. A red eval suite is the current correct state. See
+> [Known-failing scenarios](#known-failing-scenarios) before touching them — the one thing
+> not to do is relax an assertion to get green.
 
 | Runner                                     | Question it answers                             | Model calls  | Cost   |
 | ------------------------------------------ | ----------------------------------------------- | ------------ | ------ |
@@ -85,6 +92,13 @@ bounded to 6 agent steps so one runaway tool loop cannot blow the budget between
 | `min-order-trap-cheap-beauty`           | the $9.99 mascara that really costs $479.52           | yes     | yes    |
 | `upstream-zero-reversed-tokens`         | local resolution finds what `/products/search` cannot | yes     | yes    |
 | `in-stock-only-laptops`                 | availability becomes `inStock`, not a search term     | yes     | yes    |
+| `false-decline-stocked-microwave`       | **known failing** — denies a stocked item, no search  | no      | yes    |
+| `false-decline-stocked-ice-cube-tray`   | **known failing** — same, second item                 | no      | yes    |
+| `false-decline-stocked-picture-frame`   | **known failing** — same, third item                  | no      | yes    |
+| `truncation-completeness-follow-up`     | **known failing** — capped set called complete        | no      | yes    |
+| `truncation-invented-inventory-count`   | **known failing** — result-set size stated as stock   | no      | yes    |
+| `zero-sentinel-empties-catalog`         | **known failing** — `maxPrice: 0` empties the catalog | yes     | yes    |
+| `gendered-slug-false-scarcity`          | **known failing** — gendered slug → false scarcity    | no      | yes    |
 
 Three scenarios are regression tests for failures actually observed in live runs and fixed
 by prompt changes:
@@ -101,8 +115,18 @@ silently, and only the **online** runner can see any of them.
 
 ## Results of the live run
 
-**Current status: 16 of 16 scenarios pass**, 18 model calls, estimated spend **$0.033**
-against the $0.50 cap. All three regression scenarios pass.
+**Current status: 16 of 23 scenarios pass**, 27 model calls, estimated spend **$0.048**.
+The seven failures are the `knownFailing` set above — every scenario that passed before the
+QA pass still passes. All three regression scenarios pass. The offline half is 34 passing /
+3 failing, all three inside `zero-sentinel-empties-catalog`.
+
+> **A second intermittent, unrelated to the QA findings.** Across the two runs recorded here,
+> `follow-up-cheaper-than-that` passed once and failed once with `required field maxPrice was
+not set` — the model narrowed with `sort: price-asc` plus `excludeProductIds` instead of a
+> price ceiling. That is a real assertion failure with a real model call behind it, not the
+> transient-API flake described below, and it predates these scenarios. Left unfixed and
+> unmarked: it needs its own diagnosis rather than a `knownFailing` label applied on the
+> strength of two runs.
 
 The history below is kept deliberately — the two failures this suite caught, and how one of
 them was diagnosed, are the point of having built it.
@@ -198,6 +222,54 @@ validation. Anything else that inspects raw tool-call arguments will hit the sam
 phone`, `iPhone Apple` and `beauty`. Local resolution handles all three, and each is
 covered: `upstream-zero-reversed-tokens` asserts the first two directly,
 `min-order-trap-cheap-beauty` covers the `beauty` category.
+
+## Known-failing scenarios
+
+Seven scenarios encode defects found by an adversarial QA pass (32 probes against the live
+catalog) and confirmed against `https://dummyjson.com/products/...` directly. They are
+asserted exactly like every other scenario and they run **red on purpose**. Each carries a
+`knownFailing` string, which both runners print at the end of a run so an intentional red is
+never mistakable for rot.
+
+**The rule: clear one by fixing the agent, then delete its `knownFailing` field. Never by
+weakening the assertion.** An eval tuned until it agrees with current behaviour tests
+nothing — the same principle that kept `ambiguous-cheap-and-cool` failing through YAN-38.
+
+| Scenario                              | Defect                                                                    | Where the fix belongs                                |
+| ------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `false-decline-stocked-microwave`     | "this store doesn't carry microwaves" — zero tool calls; id 66 is $89.99  | `instructions.ts`                                    |
+| `false-decline-stocked-ice-cube-tray` | same, id 62 at $5.99                                                      | `instructions.ts`                                    |
+| `false-decline-stocked-picture-frame` | same, id 44 at $29.99                                                     | `instructions.ts`                                    |
+| `truncation-completeness-follow-up`   | 6 of 17 sports accessories called "the full list… no hidden pages"        | `resolve-products.ts` — needs a pre-truncation total |
+| `truncation-invented-inventory-count` | "we carry 4 different men's shoes"; there are 5                           | `resolve-products.ts` — same missing total           |
+| `zero-sentinel-empties-catalog`       | `maxPrice: 0` from a repair call eliminates all 27 groceries              | `resolve-products.ts` or `toRetrievalCriteria`       |
+| `gendered-slug-false-scarcity`        | "watches under $200" → `mens-watches`, then a catalog-wide scarcity claim | `instructions.ts`                                    |
+
+Three notes on reading them:
+
+**Finding 1 is intermittent.** Three of eight stocked items probed with this phrasing were
+falsely declined, and the trigger is item-specific priors rather than sentence shape — "do
+you sell honey?" and "do you sell spice racks?" both searched correctly. The three scenarios
+here may not all fail on a given run. The root cause is a genuine tension in the prompt:
+"Requests this catalog cannot serve" asks the model to predict emptiness _before_ retrieving,
+while an earlier section correctly states that without a tool call it knows nothing about the
+catalog. What is missing is the boundary between a _category_ the store does not serve
+(flights — correctly declined, covered by `off-catalog-flight`) and a _product_ it has simply
+not checked.
+
+**Finding 2 cannot be fixed in the prompt.** `resolveProducts` returns `ProductCard[]` capped
+at `MAX_RESULTS = 6`, and `resultCount` is the post-slice length. Nothing in the tool output
+carries how many products matched before truncation, so the honest answer — "6 of 17" —
+does not exist anywhere in the model's input. The prompt could only instruct it to hedge
+every list, which is worse UX and still guesswork. `truncation-completeness-follow-up`
+deliberately leaves `toolCalled` unasserted: answering honestly from the capped set is as
+correct as searching again, and requiring a call would fail correct behaviour.
+
+**Finding 3 is the only one with deterministic offline coverage**, and it is the reason to
+run `eval:offline` first — it fails every time, in 400ms, at zero cost, while the online half
+reproduces it only sometimes. Its five offline calls isolate one sentinel each, so a failure
+names the field. `minReturnDays: 0` is included and **passes**: it is a harmless no-op, which
+is why the fix must not blanket-strip every zero.
 
 ## What each half genuinely catches — and what slips through
 
