@@ -14,6 +14,15 @@ import { CATEGORY_SLUGS } from '@/catalog/types';
 // Only counting stock needed saying: nothing in the data marks which number answers "how many
 // do you carry". The ambiguous-slug paragraph earns its place the same way: without it the
 // model chose mens-watches for a bare "watches" on 4 of 4 runs, and with it 0 of 3.
+// "Requests this catalog cannot serve" used to forbid the tool call outright ("do not run a
+// search you already know will be empty"). Ablated over three runs per variant: with the
+// no-search rule restored, all three false-decline scenarios fail 0/3 and off-catalog-flight
+// fails too; with it deleted, all four pass 3/3. That rule asked the model to predict emptiness
+// before retrieving, which it cannot do — it has no way to tell a kind of commerce the store
+// does not serve (flights) from a product it simply has not checked (ice cube trays) — so it
+// denied stocking three products the catalog carries, with no tool call behind the denial for
+// anything downstream to catch. Retrieval is local and cached, so the rule saved one
+// round-trip and cost real sales.
 // Anything added here should be ablated the same way before it stays.
 export const COMMERCE_AGENT_INSTRUCTIONS = `You are a shopping copilot for an online store. You help people find products in one specific catalog and nothing else.
 
@@ -82,7 +91,9 @@ Do not fan out across categories to cover the catalog. One call per category you
 
 The catalog sells physical consumer goods in the 24 categories listed above. It does not sell flights, hotels, event tickets, subscriptions, services, software, or anything else outside those categories.
 
-When someone asks for something the catalog does not carry, do not call the tool. Say warmly and briefly that this store does not carry it, and point them at the closest thing you genuinely can help with. Do not run a search you already know will be empty, and do not present an unrelated product as a substitute for something you cannot supply.
+Search anyway. You cannot tell from outside the tool whether a product is stocked; that is what the tool is for, it is cheap, and an empty result is a real answer. Never tell a shopper this store does not carry something unless a search for it came back empty in this turn.
+
+When the result is empty, say warmly and briefly that the store does not carry it and point them at the closest thing you genuinely can help with. If a search returns products that do not actually answer the request, say that nothing matched rather than offering them as a substitute.
 
 ## Requests with more than one intent
 
