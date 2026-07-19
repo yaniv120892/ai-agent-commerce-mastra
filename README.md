@@ -162,82 +162,57 @@ call. I would have made the same choice at 10× the token budget.
 
 ### The ranking algorithm
 
-`src/catalog/resolve-products.ts`. Hard filters first (category, price range, rating, stock,
-shipping days, return days), then lexical scoring over what survives, then sort, then
-exclusions, then a cap of 6.
-
-Scoring is weighted token overlap, scaled by query coverage:
+`src/catalog/resolve-products.ts`. Hard filters first, then lexical scoring over what
+survives, then sort, then exclusions, then a cap of 6. Scoring is weighted token overlap
+scaled by query coverage:
 
 ```
 score = Σ(field weight × match quality) × (0.25 + 0.75 × matchedTerms / totalTerms)
 ```
 
-Field weights are title 10, tags 6, brand 4, description 2. An exact whole-title match
-short-circuits to 1000. Tokens are lowercased, split on non-alphanumerics, and naively
-singularized so "laptops" and "laptop" collide.
+**The coverage scaling is what solves the grocery-apple trap.** For
+`["apple", "laptop", "tablet", "smartphone"]`, the $1.99 Grocery Apple hits its title exactly
+— it genuinely is called "Apple" — but covers 1 of 4 terms, so it lands below the MacBook,
+iPad and iPhone, which each cover two. **Breadth beats depth**, which is the right instinct
+for a shopping query, and a test pins the _ordering_ rather than merely asserting relevance.
 
-**The coverage scaling is what solves the grocery-apple trap.** Query
-`["apple", "laptop", "tablet", "smartphone"]`: the $1.99 Grocery Apple scores a strong exact
-hit on its title — it genuinely is called "Apple" — but it covers 1 of 4 terms, so its total
-is multiplied by 0.4375, and it lands below the MacBook, the iPad, and the iPhone, which each
-cover two. **Breadth beats depth**, which is exactly the right instinct for a shopping query,
-and it is pinned by a test that asserts the ordering rather than merely asserting relevance.
+**The 4-character floor on substring matches is load-bearing.** At 3, `"beauty"` contains
+`"eau"`, so a beauty search surfaced **Gucci Bloom Eau de Parfum**. A test caught that, not
+inspection.
 
-Because the model's terms are scored independently and scaled by coverage, the system prompt
-and the tool description both instruct it to emit several short specific terms
-(`["laptop", "apple", "macbook"]`) rather than one long phrase
-(`["apple laptop for work"]`). The prompt describes the actual scoring function, so the
-model's incentives and the retriever's behaviour agree.
+On the constants: the weight _ordering_ is reasoned (title is the most precise field, brand is
+sparse and therefore weak evidence), but 10/6/4/2 and the 0.25 coverage floor were **chosen,
+not tuned** against a labelled relevance set. That set is what I would build before touching
+them.
 
-**The 4-character floor on partial matches is load-bearing.** Substring matching is allowed
-only when both the term and the token are at least 4 characters. At 3, `"beauty"` contains
-`"eau"`, so a search for _beauty_ surfaced **Gucci Bloom Eau de Parfum** — a fragrance, from
-the wrong category, ranked on a nonsense match. A test caught that, not inspection, and the
-regression test now asserts every result of a `beauty` search is actually in the `beauty`
-category.
+→ **[`docs/retrieval-design.md`](docs/retrieval-design.md)** has the full function, the
+tokenization detail behind "short terms beat long phrases", tie-breaks, and the four retrieval
+counts.
 
 ### The normalization layer the API cannot give you
 
-The single highest-leverage finding in `docs/api-findings.md`: the logistics fields _look_
-like free text but are **low-cardinality enums** — 6 distinct `shippingInformation` values, 5
-`returnPolicy`, 10 `warrantyInformation`, exhaustive across all 194 products. So
-`src/catalog/normalize.ts` parses them once at ingest into numbers: `shippingDays`,
-`returnDays`, `warrantyMonths` (with `Lifetime warranty` → `Infinity`), plus derived
-`effectivePrice` and `minimumSpend`.
+The highest-leverage finding in `docs/api-findings.md`: the logistics fields _look_ like free
+text but are **low-cardinality enums** — 6 `shippingInformation` values, 5 `returnPolicy`, 10
+`warrantyInformation`, exhaustive across all 194 products. `src/catalog/normalize.ts` parses
+them once at ingest into numbers, plus derived `effectivePrice` and `minimumSpend`.
 
-That turns "something that ships fast" into `maxShippingDays: 2` and "make sure I can return
-it" into `minReturnDays: 30` — exact numeric comparisons over fields the upstream API does
-not expose and cannot filter on. **This is the layer you structurally cannot build when you
-delegate filtering to someone else's API**, and it is the clearest argument for having moved
-retrieval into code.
+That turns "something that ships fast" into `maxShippingDays: 2` — an exact numeric comparison
+over a field the upstream API does not expose and cannot filter on. **This is the layer you
+structurally cannot build when you delegate filtering to someone else's API**, and it is the
+clearest argument for having moved retrieval into code.
 
-The mappings are exhaustive `satisfies Record<Enum, number>` objects, so adding an enum value
-without deciding its numeric meaning fails to compile. They are then wrapped in a
-`ReadonlyMap` for lookup, so an **unrecognised** value at runtime resolves to `undefined`
-rather than throwing — exhaustive at compile time, permissive at runtime.
+Ingest is exhaustive at compile time (`satisfies Record<Enum, number>`, so a new enum value
+fails the build) and permissive at runtime (unknown values resolve to `undefined` rather than
+throwing). The strict first version would **empty** the catalog rather than degrade it when
+one new upstream string appeared — five minutes after the change, with no deploy involved.
 
-That asymmetry is deliberate, and it replaced a stricter first version. Originally an unknown
-value threw and failed the whole catalog fetch. A single new category or shipping string
-appearing upstream would then not degrade the catalog, it would **empty** it: the parse threw,
-the fetch rejected, the cache never populated, and every search failed — roughly five minutes
-after upstream changed, with no deploy involved. Ingest is now permissive per field,
-`parseProducts` keeps the valid products and throws only when **fewer than half** parse (catalog
-drift versus a genuinely changed API shape), and the cache retains last-known-good.
+The subtle half: `undefined > 2` is `false`, so a product with an unparseable shipping string
+could have silently passed a bound it was never shown to meet. Unknown values are therefore
+excluded while that filter is active and included when it is not.
 
-The subtle part is on the filtering side: `undefined > 2` is `false`, so a product with an
-unparseable shipping string could have **silently passed a `maxShippingDays` bound it was never
-shown to meet**. Products with unknown logistics values are therefore excluded while the
-corresponding filter is active and included when it is not.
-
-### Discounts, and a decision that turned out not to matter
-
-Every product has a `discountPercentage` (median 11%). I filter on **list price** and display
-both prices, because filtering on the discounted price returns products that contradict the
-stated query — ask for "under $400" and get a $450 item, which is confusing even when it is
-technically cheaper. Then I checked whether the decision was load-bearing: at a $400
-threshold, list price and discounted price both yield **156 products**. Zero difference. I
-kept the rule for its correctness argument and recorded that it changes nothing today, so
-nobody re-litigates it later on the assumption that it might.
+→ Full reasoning, and the discount decision that turned out to change nothing (list price and
+discounted price both yield 156 products at a $400 threshold), in
+[`docs/retrieval-design.md`](docs/retrieval-design.md).
 
 ### The three named cases
 
@@ -254,28 +229,13 @@ unfalsifiable. Section 6 covers why getting this to actually happen was not a pr
 categories. The agent **searches first**, then declines from what came back, names what the
 store does carry, and does not present an unrelated product as a substitute.
 
-This reverses my original design, and the reversal is the more interesting half. I first shipped
-the opposite rule — decline with **zero tool calls**, on the reasoning that running a search you
-already know will be empty just to look diligent is worse than declining. An adversarial pass
-showed what that rule actually bought: the agent denied stocking a **$89.99 microwave**, a
-**$5.99 ice cube tray** and a **$29.99 photo frame**, all of which the catalog carries, **with no
-tool call behind the denial** — so no eval, guardrail, or card render could catch it downstream.
-
-The rule asked for a prediction the model cannot make. It has no way to separate a _kind of
-commerce_ this store does not serve (flights) from a _product_ it simply has not checked (ice
-cube trays), so it answered from priors and was wrong on 3 of 8 stocked items probed. Deleting
-the rule took those scenarios from **0/3 to 3/3** over three runs in each direction. The cost
-argument had been wrong too: `resolveProducts` is pure local TypeScript over a cached catalog,
-so there is **no API call** — the rule bought one model round-trip and cost sales.
+This reverses my original design, and the reversal is the more interesting half — §6 tells it
+in full. Briefly: I shipped the opposite rule (decline with **zero tool calls**), and it made
+the agent deny stocking a $89.99 microwave, a $5.99 ice cube tray and a $29.99 photo frame, all
+of which the catalog carries, **with no tool call behind the denial**. The rule asked for a
+prediction the model cannot make. Deleting it took those scenarios from **0/3 to 3/3**.
 
 An **empty result**, never a prior, is now the only thing that licenses "we don't carry that."
-A second, separate clause handles tact: searching first made the agent honest but not tactful,
-and it began narrating its tooling at shoppers (_"my search only turned up a phone accessory"_)
-— someone asking about flights never asked about your search. That wording paragraph was ablated
-over **twelve runs per variant**: 11/12 with it, 7/12 without.
-
-This scenario still has no offline coverage, because whether the planner retrieves before
-declining is a property of the planner and never reaches `resolveProducts`.
 
 **Multi-intent** — _"a phone and a laptop"_. Two intents means **two separate tool calls in
 the same turn**, each with its own terms and filters, presented as two labelled groups. A
@@ -338,55 +298,45 @@ Three decisions in there worth naming:
   `local-user` resource id, so resource scope would carry one shopping session's budget and
   shown products into the next unrelated one — and would have leaked one eval scenario's state
   into the other 26.
-- **`shownProductIds` is written by the tool, not the model.** Every other field is something
-  the shopper _said_, which the model transcribes reliably. This one is six integers copied out
-  of a tool result and reproduced exactly on every later turn — and measured live, the model
-  recorded them on about **1 run in 3**. A near-miss is invisible: a wrong id silently fails to
-  exclude the product it names. The write swallows every error by design, because it is
-  bookkeeping that improves a later "show me more", not part of answering the search the shopper
-  is waiting on. Its known weakness is a read-merge-write race: two tool calls in the same turn
-  — the multi-intent path — can lose one call's ids.
+- **`shownProductIds` is written by the tool, not the model.** Every other field is something the
+  shopper _said_, which the model transcribes reliably. This one is six integers copied out of a
+  tool result and reproduced exactly on every later turn — measured live, the model recorded them
+  on about **1 run in 3**, and a near-miss is invisible, because a wrong id silently fails to
+  exclude the product it names. The write swallows every error by design: it is bookkeeping that
+  improves a later "show me more", not part of the search the shopper is waiting on. Known
+  weakness: a read-merge-write race can lose one call's ids on the multi-intent path.
 - **It is not free.** Working memory costs roughly **+39% input tokens on every turn**, measured
-  A/B on three single-turn scenarios that cannot benefit from it at all (19,342 → 26,891 for the
-  same 3 model calls). A full eval run went from 276k to ~614k tokens, $0.079 to $0.170. That is
-  the same objection that ruled out simply raising `lastMessages`, and it applies here too — the
-  bill lands on every conversation, including short ones that never approach the window. I think
-  the trade is right because the defect was silent and the cost is visible, but it is a trade,
-  and it should be visible here rather than discovered on a bill.
+  A/B on three single-turn scenarios that cannot benefit from it (19,342 → 26,891 for the same 3
+  calls). A full eval run went $0.079 → $0.170. That is the same objection that ruled out raising
+  `lastMessages`, and it applies here too. I think the trade is right because the defect was
+  silent and the cost is visible — but it is a trade, and it belongs here rather than on a bill.
 
 ### What happens when storage fails
 
-This is the question the assignment actually asks, so here is the implemented behaviour
-rather than an intention.
+Implemented behaviour, not intention.
 
-**Corrupted.** `ensureUsableDatabaseFile` runs _before_ the store is constructed and checks
-that the file begins with the 16-byte `SQLite format 3\0` header. A file that fails that
-check — truncated, or overwritten by something that is not a database — is renamed to
-`commerce-memory.db.corrupt-<timestamp>` and a fresh database takes its place. Without this,
-libsql throws on the first _query_ rather than at open time, so a corrupt file surfaces as an
-opaque 500 on some unrelated route much later. A zero-length file is treated as fresh rather
-than corrupt, because libsql creates the file before writing the header.
+**Corrupted.** `ensureUsableDatabaseFile` runs _before_ the store is constructed and checks the
+16-byte `SQLite format 3\0` header. A file that fails is renamed to
+`commerce-memory.db.corrupt-<timestamp>` and a fresh database takes its place. Without it,
+libsql throws on the first _query_ rather than at open time, so corruption surfaces as an opaque
+500 on an unrelated route much later. A zero-length file is treated as fresh, because libsql
+creates the file before writing the header.
 
-**Missing or cleared mid-conversation.** The file and its parent directory are recreated on
-demand, so the app starts. The open conversation, however, is gone: `memory.recall()` throws
-`No thread found with id <id>` rather than returning empty, so both chat routes check
-`getThreadById` first and return a **404 with a clear message** — `Conversation not found
-(threadId: …)` — never a 500. On the client, a failed hydration surfaces as an error in the
-message pane rather than an infinite spinner, and "New chat" always works because it creates
-a fresh thread through `POST /api/conversations` before the first turn is sent.
+**Missing or cleared mid-conversation.** File and parent directory are recreated on demand, so
+the app starts. The open conversation is gone: `recall()` throws rather than returning empty, so
+both chat routes check `getThreadById` first and return a **404 with a clear message**, never a 500. A failed hydration surfaces as an error in the message pane, not an infinite spinner, and
+"New chat" always works because it creates a fresh thread before the first turn is sent.
 
-**Full.** A write failure before the stream opens becomes a JSON error response with a
-status. Once the stream is open an HTTP status is no longer available, so `handleChatStream`'s
-`onError` emits an error _part_ — the user reads "The assistant could not finish this reply:
-…" instead of watching a turn silently stop. This is the honest limit: a disk-full failure at
-the moment of persistence is reported, not recovered from, and the turn is lost.
+**Full.** A write failure before the stream opens becomes a JSON error with a status. Once the
+stream is open an HTTP status is no longer available, so `onError` emits an error _part_ instead
+of a turn that silently stops. This is the honest limit: a disk-full failure at the moment of
+persistence is reported, not recovered from, and the turn is lost.
 
-**A subtler one — history that mutes the conversation.** Recall replays stored turns
-verbatim, including calls naming a tool the agent no longer declares. OpenAI answers such a
-prompt with an empty `stop` turn and no tool calls: long-lived threads go silent while fresh
-threads keep working, with no error anywhere. `KnownToolsOnlyProcessor` strips those calls and
-their results from the _outgoing prompt only_, leaving stored history and rendered cards
-intact.
+**A subtler one — history that mutes the conversation.** Recall replays stored turns verbatim,
+including calls naming a tool the agent no longer declares. OpenAI answers such a prompt with an
+empty `stop` turn: long-lived threads go silent while fresh ones work, with no error anywhere.
+`KnownToolsOnlyProcessor` strips those from the _outgoing prompt only_, leaving stored history
+and rendered cards intact.
 
 ---
 
@@ -402,18 +352,14 @@ different questions. Full detail in `evals/README.md`.
 
 **Offline** is deterministic: **41 assertions** over a fixed 26-product fixture, never the live
 catalog, because upstream data can change under you and a golden dataset that moves is not
-golden. It pins exact result sets, exact `minimumSpend` values, exact disjointness between
-paginated pages, and the four retrieval counts. **41 of 41 pass.**
+golden. It pins exact result sets, `minimumSpend` values, page disjointness, and the four
+retrieval counts. **41 of 41 pass.**
 
-**Online** runs the real `gpt-5.4-mini` against the live catalog. The best recorded sweep is
-**26 of 27**, at 54 model calls and **~$0.170** estimated spend. `SpendCap` accumulates usage and
-checks the budget _before_ each call so a run stops rather than overshoots, and each turn is
-bounded to 6 agent steps so one runaway tool loop cannot blow the budget between checks. It
-refuses to run against the `sk-your-key-here` placeholder and fails loudly with no key — a
-skipped run must never be mistakable for a passing one.
-
-The dollar figure is **measured tokens against a configurable rate estimate**
-(`evals/spend-cap.ts`), not a billed amount. Treat it as an order of magnitude.
+**Online** runs the real `gpt-5.4-mini` against the live catalog. Best recorded sweep is **26 of
+27**, at 54 model calls and **~$0.170**. `SpendCap` checks the budget _before_ each call so a run
+stops rather than overshoots, and it fails loudly with no key — a skipped run must never be
+mistakable for a passing one. The dollar figure is measured tokens against a configurable rate
+estimate (`evals/spend-cap.ts`), not a billed amount.
 
 **Expect 25–26 of 27 on any given run**, and here is exactly what varies, because a suite that
 only reports its best day is not being honest:
@@ -424,73 +370,60 @@ only reports its best day is not being honest:
 | `pagination-ids-survive-window-eviction` | ~8 runs in 10, deliberately unmarked — see §4 |
 | `truncation-completeness-follow-up`      | **A stale assertion, not an agent defect**    |
 
-That last one is worth stating plainly rather than letting a reviewer find it. On the most
-recent run the agent replied:
+That last one is worth stating plainly rather than letting a reviewer find it. The agent replied
+_"Not complete — there are 11 more sports accessories beyond the six shown here"_ — correct on
+both halves — and failed anyway, because the scenario's `requiredAnyOf` wants the literal
+`there are more` and the count breaks the adjacency. The pattern predates
+`remainingAfterThisPage`, so it now demands the count _not_ be stated, which is the opposite of
+what that field was added to achieve.
 
-> _"Not complete — there are 11 more sports accessories beyond the six shown here."_
-
-which is correct on both halves: it says the list is incomplete and gives the honest remainder.
-It failed anyway, because the scenario's `requiredAnyOf` looks for the literal string
-`there are more` and the count breaks the adjacency. The pattern was written before
-`remainingAfterThisPage` existed, when the honest reply could not name a number — so it now
-demands the count _not_ be stated, which is the opposite of what the field was added to achieve.
-
-It is the **sixth** time in this project an assertion has failed correct behaviour (§5 lists the
-others). The rule stays the same: fix the assertion, never relax it. The fix is to permit an
-optional count — `there are (\d+ )?more` — and it is unfixed only because I found it in the last
-run before submitting and would rather ship it documented than ship it patched and unverified.
+Sixth time in this project an assertion has failed correct behaviour. The rule holds: fix the
+assertion, never relax it (`there are (\d+ )?more`). Unfixed only because I found it in the last
+run before submitting, and shipping it documented beats shipping it patched and unverified.
 
 ### One scenario is red on purpose
 
-`follow-up-cheaper-than-that` carries a `knownFailing` marker and both runners print the set at
-the end of every run, so an intentional red is never mistakable for rot. Roughly one run in
-three, the model answers "cheaper than that" with `sort: price-asc` plus `excludeProductIds` and
-**no `maxPrice`** — which orders the results but never guarantees any of them is actually cheaper
-than what the shopper was already shown. It is diagnosed and not yet fixed.
+`follow-up-cheaper-than-that` carries a `knownFailing` marker, and both runners print the set at
+the end of every run so an intentional red is never mistakable for rot. Roughly one run in three
+the model answers "cheaper than that" with `sort: price-asc` and **no `maxPrice`** — which orders
+the results but never guarantees any of them is cheaper than what the shopper already saw.
 
 I kept it red rather than relax the assertion, because the rule that makes this suite worth
 anything is: **clear a `knownFailing` by fixing the agent and deleting the field, never by
 weakening the assertion.** An eval tuned until it agrees with current behaviour tests nothing.
 Six fixes in this project cleared their markers that way; this one has not been earned yet.
 
-The scenario also taught me something about intermittents. For most of the project it was
-_two different failures wearing one name_ — the mode above, and a second mode where **correct**
-behaviour was failing a stale assertion written back when empty `searchTerms` alongside a
-`categorySlug` was schema-rejected. The second mode hid inside the first's known flakiness for
-weeks. An undiagnosed intermittent is not a neutral cost; it is a place regressions hide. The
-marker now names mode A precisely, so a change in its rate means something again.
-
-Separately, `pagination-ids-survive-window-eviction` passes about 8 runs in 10. It is _not_
-marked `knownFailing`, because the defect the marker would describe — the shown product ids
-never reaching the model — is genuinely fixed; working memory carries them even on failing runs.
-Re-marking it would assert something false.
+It also taught me something about intermittents. For most of the project it was _two failures
+wearing one name_, and the second — correct behaviour failing a stale assertion — hid inside the
+first's known flakiness for weeks. **An undiagnosed intermittent is not a neutral cost; it is a
+place regressions hide.**
 
 Around them: **216 unit and integration tests** across 17 files, and **5 Playwright E2E tests**
 covering card rendering, reload persistence, sidebar resume, and fresh-thread isolation.
 
 **Why plain Vitest and not Mastra's scorers.** A golden dataset over a fixed catalog is a
 _deterministic assertion problem_, not a grading problem. "Does the $419.99 Galaxy survive
-`maxPrice: 400`?" has exactly one right answer — one an LLM judge could only get _wrong_,
-while charging me an API call to do it. Even the online assertions are structural (was the
-tool called, how many times, which fields were set) rather than qualitative. The one place a
-judge would genuinely help is grading tone, which this project deliberately does not assert,
-because prose is non-deterministic and cards render from tool results anyway.
+`maxPrice: 400`?" has exactly one right answer — one an LLM judge could only get _wrong_, while
+charging me an API call to do it. The one place a judge would help is grading tone, which this
+project deliberately does not assert.
 
 ### What slips through — the honest version
 
-This split is the answer to "what would your evals miss?", and both runners print it at the
-end of a run so the gap travels with the results.
+Both runners print this at the end of a run, so the gap travels with the results.
 
-**Offline cannot catch a single prompt regression.** It never calls the model. All three of
-the real prompt failures below would sail through an entirely green offline run. It cannot
-see whether the tool was called at all, whether criteria were invented, whether an off-catalog
-request was declined, whether assumptions were disclosed, whether an injection was obeyed, or
-whether the reply fabricated a product or a price.
+**Offline cannot catch a single prompt regression**, because it never calls the model — not
+whether the tool was called at all, criteria were invented, an injection was obeyed, or the
+reply fabricated a product or a price. Every prompt failure in §6 would sail through a green
+offline run.
 
-**Online cannot catch a retrieval or ranking regression hiding behind a plausible plan** — a
-correct-looking set of criteria that quietly returns the wrong products. It asserts prose only
-negatively (phrases that would constitute a fabricated retrieval claim) plus one loose check
-that a vague request disclosed its assumptions, because exact wording is not reproducible.
+**Online cannot catch a retrieval regression hiding behind a plausible plan** — correct-looking
+criteria that quietly return the wrong products.
+
+**Neither covers** the streaming/UI layer (Playwright territory), ingest against the live API,
+latency, or multi-turn drift beyond the modelled follow-ups.
+
+→ **[`evals/README.md`](evals/README.md)** has the per-scenario coverage table, the assertion
+vocabulary, the prompt ablation ledger, and the fix history behind each regression scenario.
 
 **Neither half covers** the streaming and UI layer (Playwright territory), catalog ingest
 against the live API, latency or cost regressions, or multi-turn drift beyond the two-turn
@@ -614,36 +547,29 @@ disproven capability is worth re-testing before you architect around its absence
 - **`gpt-5.4-nano` is untested end-to-end.** It is permitted by the env schema; the evals were
   run against `gpt-5.4-mini`.
 - **The chat route still trusts most of the client body.** `POST /api/chat` spreads the request
-  body into `handleChatStream` and then overrides exactly two fields: `memory`, so thread and
-  resource scoping cannot be redirected, and `maxSteps`, so a client cannot raise its own step
-  ceiling. Both are written **after** the spread, which is what makes them server-controlled —
-  that ordering is load-bearing and is covered by tests so a later edit cannot reorder it
-  silently. Every _other_ field the client sends is still forwarded to the agent.
-
-  That is acceptable for a single-user local app and would not be for a deployed one, where a
-  client could plausibly inject `instructions` or `tools` — a system-prompt override, not just
-  untidiness. The real fix is an explicit allowlist of forwarded fields. I pinned the two that
-  matter rather than narrowing the type late, because narrowing that object is exactly what
-  breaks `handleChatStream`'s v6 overload resolution (see the comment in
-  `src/app/api/chat/route.ts`) — doing it properly means constructing a correctly-typed params
-  object, not adding a cast.
+  body into `handleChatStream` and overrides exactly two fields after the spread: `memory`, so
+  thread and resource scoping cannot be redirected, and `maxSteps`, so a client cannot raise its
+  own step ceiling. That ordering is load-bearing and covered by tests. Every _other_ field is
+  still forwarded — acceptable for a single-user local app, not for a deployed one, where a
+  client could inject `instructions` or `tools` and override the system prompt. The real fix is
+  an explicit allowlist; narrowing the type late is exactly what breaks `handleChatStream`'s v6
+  overload resolution, so doing it properly means constructing a correctly-typed params object,
+  not adding a cast.
 
 ### Why I skipped embeddings
 
 Two reasons, and the second is decisive.
 
-First, there is **no embedding model on the assignment's allowed list** — `gpt-5.4-mini` and
-`gpt-5.4-nano`, nothing else. A vector index I cannot populate is not a design choice.
+First, there is **no embedding model on the assignment's allowed list**. A vector index I
+cannot populate is not a design choice.
 
-Second, and more interesting: **price is not embeddable.** "Under $400" has no vector
-operation. Every hard constraint in this domain — budget, rating floor, stock, shipping
-window, return window, minimum order quantity — is a numeric comparison, and a numeric
-comparison is exactly the thing embeddings cannot express. A vector index would have handled
-the _lexical_ half of retrieval, which the coverage-scaled scorer already handles well enough
-over 194 products, and would have done nothing at all for the half that actually drives the
-answers. On a catalog of 194 items, an embedding index buys semantic synonymy and costs a
-build step, a dependency, and a staleness problem. At 194,000 items I would revisit it — and I
-would still filter numerically in code first and rank semantically within the survivors.
+Second: **price is not embeddable.** Every hard constraint in this domain — budget, rating
+floor, stock, shipping window, return window, minimum order quantity — is a numeric comparison,
+which is exactly what embeddings cannot express. A vector index would have handled the _lexical_
+half of retrieval, which the coverage-scaled scorer already handles well enough over 194
+products, and nothing at all for the half that actually drives the answers. At 194,000 items I
+would revisit it — and I would still filter numerically in code first and rank semantically
+within the survivors.
 
 ### With another week
 
@@ -652,7 +578,8 @@ would still filter numerically in code first and rank semantically within the su
    the dataset today puts the payload in a _user message_. The catalog is third-party data
    flowing straight into model context via tool output, so it is the more realistic attack on a
    commerce agent and it is the one I have not tested.
-2. **A timeout and a surfaced diagnostics channel on ingest** — see the two limitations above.
+2. **A surfaced diagnostics channel on ingest.** Unknown upstream values are collected and
+   `console.warn`ed once per load; they should be on a dashboard, not in a log line.
 3. **Streaming-layer evals.** Neither eval half sees the UI, so a regression that breaks card
    rendering while leaving the plan perfect is caught only by five Playwright tests.
 4. **Attack the prose gap.** Cards cannot lie but sentences can. A cheap deterministic check —
