@@ -21,17 +21,6 @@ async function executeTool(criteria: ResolveProductsInput): Promise<ResolveProdu
   return resolveProductsOutputSchema.parse(result);
 }
 
-function isToolInputValidationError(result: unknown): result is { error: true; message: string } {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'error' in result &&
-    result.error === true &&
-    'message' in result &&
-    typeof result.message === 'string'
-  );
-}
-
 function jsonResponse(): Response {
   return new Response(JSON.stringify({ products: fixtureCatalog }), {
     status: 200,
@@ -65,18 +54,6 @@ describe('resolveProductsTool', () => {
     expect(retrievalCriteriaSchema.safeParse(nulledEnums).success).toBe(false);
   });
 
-  it('rejects an empty searchTerms list carrying a categorySlug', () => {
-    const result = resolveProductsInputSchema.safeParse({
-      searchTerms: [],
-      categorySlug: 'beauty',
-    });
-
-    expect(result.success).toBe(false);
-    const issue = result.error?.issues[0];
-    expect(issue?.path).toEqual(['categorySlug']);
-    expect(issue?.message).toContain('beauty');
-  });
-
   it.each([
     ['an empty list with no category at all', { searchTerms: [] }],
     ['an empty list with an explicitly null category', { searchTerms: [], categorySlug: null }],
@@ -84,21 +61,32 @@ describe('resolveProductsTool', () => {
       'a category alongside real search terms',
       { searchTerms: ['mascara'], categorySlug: 'beauty' },
     ],
-  ])('still accepts %s', (_label, input) => {
+    [
+      'an empty list carrying a category, which browses that category',
+      { searchTerms: [], categorySlug: 'beauty' },
+    ],
+  ])('accepts %s', (_label, input) => {
     expect(resolveProductsInputSchema.safeParse(input).success).toBe(true);
   });
 
-  it('hands the model a correctable tool result rather than throwing on the contradictory pair', async () => {
-    const result = await resolveProductsTool.execute!(
-      { searchTerms: [], categorySlug: 'beauty' },
-      { observe: noopObserve },
-    );
+  it('browses a whole category when searchTerms is empty', async () => {
+    const result = await executeTool({ searchTerms: [], categorySlug: 'beauty' });
 
-    expect(isToolInputValidationError(result)).toBe(true);
-    if (isToolInputValidationError(result)) {
-      expect(result.message).toContain('categorySlug');
-      expect(result.message).toContain('beauty');
-    }
+    expect(result.products.length).toBeGreaterThan(0);
+    expect(result.products.every((product) => product.category === 'beauty')).toBe(true);
+    expect(result.totalInCategory).toBe(result.totalMatched);
+  });
+
+  it('ignores a zero upper bound rather than filtering the catalog down to nothing', async () => {
+    const unbounded = await executeTool({ searchTerms: [], categorySlug: 'beauty' });
+    const zeroBounded = await executeTool({
+      searchTerms: [],
+      categorySlug: 'beauty',
+      maxPrice: 0,
+      maxShippingDays: 0,
+    });
+
+    expect(zeroBounded.products).toEqual(unbounded.products);
   });
 
   it('treats a null categorySlug as no category filter rather than as a filter matching nothing', async () => {
