@@ -36,15 +36,20 @@ const COVERAGE_FLOOR = 0.25;
 // a capped list cannot tell "this is everything" from "this is the first six of many". The
 // two category counts answer the questions a categorySlug makes unanswerable: how much the
 // filter hid, and how large the category is regardless of search terms.
+// remainingAfterThisPage answers the one totalMatched invites a caller to get wrong: on a
+// second page the cards on screen are themselves inside totalMatched, so the remainder is
+// stated here rather than left as a subtraction for the caller to perform.
 export function resolveProductsWithTotals(
   criteria: RetrievalCriteria,
   catalog: NormalizedProduct[],
 ): RetrievalResult {
   const retained = selectMatching(criteria, catalog);
+  const products = retained.slice(0, MAX_RESULTS).map((entry) => toProductCard(entry.product));
 
   return {
-    products: retained.slice(0, MAX_RESULTS).map((entry) => toProductCard(entry.product)),
+    products,
     totalMatched: retained.length,
+    remainingAfterThisPage: retained.length - products.length,
     totalMatchedWithoutCategoryFilter: countMatchedWithoutCategoryFilter(criteria, catalog),
     totalInCategory: countInCategory(criteria, catalog),
   };
