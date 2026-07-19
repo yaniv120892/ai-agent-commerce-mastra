@@ -212,6 +212,26 @@ describe('resolveProducts exclusions', () => {
     }
   });
 
+  it('does not let a short brand name match a coincidental substring', () => {
+    // "le" sits inside Palette, Klein, Apple and Rolex without naming any of their brands.
+    const withoutExclusion = idsOf(resolveProducts({ searchTerms: [] }, catalog));
+    const withExclusion = idsOf(
+      resolveProducts({ searchTerms: [], excludeBrands: ['le'] }, catalog),
+    );
+
+    expect(withExclusion).toEqual(withoutExclusion);
+  });
+
+  it('still excludes a short brand name that stands as its own word', () => {
+    const calvinKleinId = 6;
+
+    expect(catalog.find((product) => product.id === calvinKleinId)?.title).toContain('CK');
+    expect(idsOf(resolveProducts({ searchTerms: ['ck'] }, catalog))).toContain(calvinKleinId);
+    expect(
+      idsOf(resolveProducts({ searchTerms: ['ck'], excludeBrands: ['CK'] }, catalog)),
+    ).not.toContain(calvinKleinId);
+  });
+
   it('never hard-filters on brand for products missing the field', () => {
     const cards = resolveProducts(
       { searchTerms: [], categorySlug: 'kitchen-accessories' },
