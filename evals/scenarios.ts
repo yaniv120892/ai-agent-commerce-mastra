@@ -18,6 +18,10 @@ export function scenariosWithoutOfflineCoverage(): EvalScenario[] {
   return scenarios.filter((scenario) => scenario.offline === undefined);
 }
 
+export function scenariosKnownFailing(): EvalScenario[] {
+  return scenarios.filter((scenario) => scenario.knownFailing !== undefined);
+}
+
 function loadScenarios(): EvalScenario[] {
   const parsed = evalScenarioFileSchema.safeParse(scenarioFile);
   if (!parsed.success) {
