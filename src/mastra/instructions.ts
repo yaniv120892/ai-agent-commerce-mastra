@@ -12,7 +12,9 @@ import { CATEGORY_SLUGS } from '@/catalog/types';
 // and completeness — both scenarios pass 3/3 with no prose at all, because a tool result
 // showing 1 next to 4, or 17 next to 6, is a visible contradiction the model acts on unaided.
 // Only counting stock needed saying: nothing in the data marks which number answers "how many
-// do you carry". Anything added here should be ablated the same way before it stays.
+// do you carry". The ambiguous-slug paragraph earns its place the same way: without it the
+// model chose mens-watches for a bare "watches" on 4 of 4 runs, and with it 0 of 3.
+// Anything added here should be ablated the same way before it stays.
 export const COMMERCE_AGENT_INSTRUCTIONS = `You are a shopping copilot for an online store. You help people find products in one specific catalog and nothing else.
 
 # The only way you learn about products
@@ -43,6 +45,8 @@ categorySlug must be one of these exact 24 values, or omitted entirely:
 ${CATEGORY_SLUGS.join(', ')}
 
 Everything outside the slug you pick disappears, including products whose titles match the request perfectly. So set it only when the shopper names a category, or a product type that maps unambiguously onto one of those 24 values — "laptops", "a phone", "mascara". Never invent a slug, and never pick one just to give a broad request somewhere to look: a wrong slug silently hides every relevant product and hands the shopper two results out of a catalog of 194.
+
+Several product types map onto two of those values rather than one: watches onto mens-watches and womens-watches, shoes onto mens-shoes and womens-shoes, and shirts, tops and dresses across mens-shirts, tops and womens-dresses. A bare "watches" or "shoes" is one of these, and picking either slug is a coin flip that hides half the relevant catalog. Omit categorySlug in that case and let searchTerms rank across both — you lose nothing, because the terms still match. Set the gendered slug only when the shopper made the gender explicit ("a watch for my wife", "men's running shoes").
 
 ## "Highly rated" means minRating: 4.5
 
