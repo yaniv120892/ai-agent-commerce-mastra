@@ -1,5 +1,6 @@
 import {
   scenarios,
+  scenariosKnownFailing,
   scenariosWithOfflineCoverage,
   scenariosWithoutOfflineCoverage,
 } from './scenarios';
@@ -39,6 +40,7 @@ export function formatOfflineReport(): string {
     ...OFFLINE_MISSES.map((line) => `  - ${line}`),
     '',
     ...formatUncoveredScenarios(),
+    ...formatKnownFailingScenarios(),
     'Run `npm run eval:online` for the half that exercises the real planner.',
     '',
   ].join('\n');
@@ -57,9 +59,27 @@ export function formatOnlineReport(spendSummary: string, executedScenarios: numb
     'list of phrases that would constitute a fabricated retrieval claim.',
     '',
     'It CANNOT CATCH: a retrieval or ranking regression hidden behind a plausible plan.',
+    '',
+    ...formatKnownFailingScenarios(),
     'Run `npm run eval:offline` for the half that pins selection exactly.',
     '',
   ].join('\n');
+}
+
+// A diagnosed-but-unfixed scenario is still asserted like every other one, so the suite
+// runs red on purpose. Without this block a reviewer cannot tell an intentional red from
+// a regression, and the tempting fix is to relax the assertion.
+function formatKnownFailingScenarios(): string[] {
+  const knownFailing = scenariosKnownFailing();
+  if (knownFailing.length === 0) {
+    return [];
+  }
+
+  return [
+    `Known failing — diagnosed, not yet fixed. These are EXPECTED to be red (${knownFailing.length}):`,
+    ...knownFailing.map((scenario) => `  ${scenario.id}: ${scenario.knownFailing}`),
+    '',
+  ];
 }
 
 function formatUncoveredScenarios(): string[] {
