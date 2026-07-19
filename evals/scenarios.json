@@ -843,8 +843,7 @@
     {
       "id": "gendered-slug-unrequested-narrowing",
       "query": "show me watches under $200",
-      "proves": "A product type that maps onto two category slugs is not silently narrowed to one. \"watches\" straddles mens-watches and womens-watches, and the model picks mens-watches unprompted, hiding id 194 Women's Wrist Watch at $129.99.",
-      "knownFailing": "QA finding 4, first half \u2014 the unrequested gendered slug itself. The retrieval counts do not address this; it needs the prompt rule for a product type matching two or more slugs.",
+      "proves": "A product type that maps onto two category slugs is not silently narrowed to one. \"watches\" straddles mens-watches and womens-watches; the model used to pick mens-watches unprompted on every run, hiding id 194 Women's Wrist Watch at $129.99. Omitting the slug costs nothing \u2014 the search terms still rank watches from both.",
       "regressionOf": "adversarial QA probe gender-slug-false-scarcity",
       "expect": {
         "toolCalled": true,
