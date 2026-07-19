@@ -36,7 +36,7 @@ API call to do so. Every offline assertion here is of that kind: exact result se
 The online half does need the real model, but even there the assertions are structural
 (was the tool called, how many times, which fields were set) rather than qualitative, so a
 judge adds latency and non-determinism without adding signal. Vitest gives us exact
-answers in the same runner and the same reporter as the other 136 unit tests, at zero cost,
+answers in the same runner and the same reporter as the other 208 unit tests, at zero cost,
 with failures that point at a line rather than at a score.
 
 The one place a scorer would genuinely help — grading tone or helpfulness of prose — is
@@ -662,6 +662,63 @@ A partial win worth noting even though its scenario stays red: on `zero-sentinel
 the reply improved from _"I couldn't pull any grocery items"_ to _"there are 27 grocery items
 in the catalog"_. `totalInCategory` gives a true number even when the poisoned search returns
 nothing. The scenario still fails, correctly — zero products came back.
+
+## The prompt ablation ledger
+
+Every section of `src/mastra/instructions.ts` is here, with what measuring it produced. The rule
+the project follows: **anything added to the prompt gets ablated before it stays** — cut it,
+re-run `npm run eval:online`, and keep it only if the suite says it earns its tokens. One run
+proves nothing; the standard is three runs per variant, and the two cases that mattered most got
+twelve.
+
+This table is the index. The detail sections above and below carry the per-scenario tables.
+
+| Prompt section                                                             | Verdict                | Measurement                                                                                                                                                                                                                                                           | Detail                                                                                                    |
+| -------------------------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Call mechanics (how to shape a call)                                       | **Cut**                | 16/16 held without it — the tool's own description already carries it, colocated with the schema. Input tokens 140k → 109k per run (−22%).                                                                                                                            | [Enforcement, coverage, and a measured ablation](#enforcement-coverage-and-a-measured-ablation)           |
+| Five restatements of the `categorySlug` rule                               | **Cut**                | Four of five paragraphs deleted, 16/16 held.                                                                                                                                                                                                                          | same                                                                                                      |
+| "Superlatives about the whole catalog"                                     | **Cut, then restored** | Removing it reproduced the fan-out failure on two consecutive runs — `searchTerms: ["product"]`, no rating floor. Put back, and now guarded by a free unit test so deleting it again fails cheaply.                                                                   | same                                                                                                      |
+| "How many there are"                                                       | **Trimmed, kept**      | Three runs per variant at 1045 chars and 361 chars — both 3/3. Cut entirely, `truncation-invented-inventory-count` drops to 1/3. Trimmed to 361.                                                                                                                      | [The ablation for "How many there are"](#the-ablation-for-how-many-there-are)                             |
+| Paragraphs explaining `totalMatchedWithoutCategoryFilter` and completeness | **Cut**                | Both scenarios 3/3 with no prose at all. A tool result showing 1 next to 4, or 17 next to 6, is a visible contradiction the model acts on unaided. Only counting stock needed saying, because nothing in the data marks which number answers "how many do you carry". | same                                                                                                      |
+| Ambiguous gendered-slug paragraph                                          | **Kept**               | Without it the model chose `mens-watches` for a bare "watches" on **4 of 4** runs; with it, **0 of 3**, and `simple-category-laptops` / `ambiguous-cheap-and-cool` held 3/3 so the rule did not overshoot into never setting a slug.                                  | [Known-failing scenarios](#known-failing-scenarios), finding 4                                            |
+| "Requests this catalog cannot serve" — the no-search rule                  | **Deleted**            | Restored: all three `false-decline-*` scenarios **0/3** and `off-catalog-flight` fails too. Deleted: all four **3/3**.                                                                                                                                                | [The ablation for "search before you decline"](#the-ablation-for-search-before-you-decline)               |
+| Decline wording                                                            | **Kept**               | Twelve runs per variant: `off-catalog-flight` **11/12** with it, **7/12** without.                                                                                                                                                                                    | below                                                                                                     |
+| Expanded "show me more" bullet                                             | **Kept**               | 3/3 over both eviction scenarios; reverting to the original one-line form drops to 2/3.                                                                                                                                                                               | [The ablation for the working-memory prompt changes](#the-ablation-for-the-working-memory-prompt-changes) |
+| Two paragraphs restating that recorded state stays in force                | **Cut as prompt tax**  | Also 3/3 — Mastra injects its own working-memory block every turn, which already tells the model to store and read state. What that block _cannot_ know is which recorded field feeds which tool argument, and that is the only part worth paying for.                | same                                                                                                      |
+| `remainingAfterThisPage` clause                                            | **Kept**               | Measured in the prescribed order — field shipped alone first, prose only after. With the clause 3/3 on all four scenarios; cut, 2/3 on the new one.                                                                                                                   | [The ablation for `remainingAfterThisPage`](#the-ablation-for-remainingafterthispage)                     |
+
+### The ablation for the decline wording
+
+This one is recorded only here. Searching before declining made the agent honest, but it did not
+make it tactful — it began narrating its tooling at shoppers:
+
+> "I searched, but nothing matches; the closest result was a mobile-accessories item."
+
+Someone asking about flights never asked about your search, and that sentence never actually says
+the store does not sell them. The fix is a paragraph asking for the decline in the shopper's
+terms ("This store doesn't sell flights") rather than in the agent's.
+
+Ablated over **twelve runs per variant**, because the scenario sits at the noise floor and three
+runs could not separate the variants:
+
+| Variant                              | `off-catalog-flight` |
+| ------------------------------------ | -------------------- |
+| **Decline-wording paragraph (kept)** | **11/12**            |
+| Paragraph cut                        | 7/12                 |
+
+Every failure in the cut variant is the same shape — the narrated-search sentence above — which
+is what makes the gap readable as signal rather than variance.
+
+### Reading `remainingAfterThisPage`'s 2/3 honestly
+
+The one-in-three gap on the cut variant is exactly the noise floor elsewhere in this suite, so on
+its own it is weak evidence. It stayed because it agrees with the mechanism: the "How many there
+are" section is an _enumeration_ of which counts license a claim, so a count absent from the list
+reads as one that does not license anything. The failing run made **no** count claim at all
+rather than a false one — safe, but not a regression guard.
+
+Note what the field achieved unaided: across all six runs in both variants the overstatement
+never recurred once. **The structure fixed the falsehood; the prose only fixed the silence.**
 
 ## What each half genuinely catches — and what slips through
 
