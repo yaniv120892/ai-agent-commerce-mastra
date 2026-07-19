@@ -5,7 +5,7 @@ import {
   productWithUnknownLogistics,
 } from './__fixtures__/catalog';
 import { normalizeProduct } from './normalize';
-import { resolveProducts } from './resolve-products';
+import { resolveProducts, resolveProductsWithTotals } from './resolve-products';
 import type { RetrievalCriteria } from './types';
 
 const APPLE_ELECTRONICS_TERMS = ['apple', 'laptop', 'tablet', 'smartphone'];
@@ -308,6 +308,56 @@ describe('resolveProducts card mapping', () => {
 
     expect(longDescriptionCard?.shortDescription.endsWith('…')).toBe(true);
     expect(shortDescriptionCard?.shortDescription.endsWith('…')).toBe(false);
+  });
+});
+
+describe('resolveProductsWithTotals', () => {
+  it('reports the pre-truncation total when the result set is capped', () => {
+    const result = resolveProductsWithTotals({ searchTerms: [] }, catalog);
+
+    expect(result.products).toHaveLength(6);
+    expect(result.totalMatched).toBe(catalog.length);
+  });
+
+  it('reports totalMatched equal to the card count when nothing was truncated', () => {
+    const result = resolveProductsWithTotals({ searchTerms: [], categorySlug: 'laptops' }, catalog);
+
+    expect(result.totalMatched).toBe(result.products.length);
+  });
+
+  it('counts what the category filter hid, so a narrow search cannot look catalog-wide', () => {
+    const result = resolveProductsWithTotals(
+      { searchTerms: ['apple'], categorySlug: 'laptops' },
+      catalog,
+    );
+
+    expect(result.totalMatched).toBe(1);
+    expect(result.totalMatchedWithoutCategoryFilter).toBeGreaterThan(result.totalMatched);
+  });
+
+  it('counts the whole category regardless of search terms that failed to score', () => {
+    const result = resolveProductsWithTotals(
+      { searchTerms: ['nonexistent-term'], categorySlug: 'groceries' },
+      catalog,
+    );
+
+    expect(result.totalMatched).toBe(0);
+    expect(result.totalInCategory).toBe(3);
+  });
+
+  it('leaves both category counts undefined when no category was requested', () => {
+    const result = resolveProductsWithTotals({ searchTerms: ['laptop'] }, catalog);
+
+    expect(result.totalMatchedWithoutCategoryFilter).toBeUndefined();
+    expect(result.totalInCategory).toBeUndefined();
+  });
+
+  it('returns the same cards resolveProducts does', () => {
+    const criteria = { searchTerms: ['phone'], maxPrice: 400 };
+
+    expect(resolveProductsWithTotals(criteria, catalog).products).toEqual(
+      resolveProducts(criteria, catalog),
+    );
   });
 });
 

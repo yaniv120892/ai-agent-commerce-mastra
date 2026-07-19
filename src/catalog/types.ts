@@ -130,6 +130,15 @@ export type RawProduct = z.infer<typeof rawProductSchema>;
 export type ProductCard = z.infer<typeof productCardSchema>;
 export type RetrievalCriteria = z.infer<typeof retrievalCriteriaSchema>;
 
+// The two category counts are undefined when the criteria carried no categorySlug — there
+// is no category to have hidden anything or to have a size.
+export type RetrievalResult = {
+  products: ProductCard[];
+  totalMatched: number;
+  totalMatchedWithoutCategoryFilter: number | undefined;
+  totalInCategory: number | undefined;
+};
+
 // Deliberately a plain type, not a zod schema: 'Lifetime warranty' normalizes to
 // Infinity, and zod 4's z.number() rejects non-finite values.
 //

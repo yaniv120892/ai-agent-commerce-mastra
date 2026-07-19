@@ -10,7 +10,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixtureCatalog } from '@/catalog/__fixtures__/catalog';
 import { resetCatalogCache } from '@/catalog/catalog-cache';
-import { resolveProducts } from '@/catalog/resolve-products';
+import { resolveProducts, resolveProductsWithTotals } from '@/catalog/resolve-products';
 import { normalizeProduct } from '@/catalog/normalize';
 import { retrievalCriteriaSchema, type RetrievalCriteria } from '@/catalog/types';
 import { HISTORY_WINDOW_MESSAGES } from './memory';
@@ -132,9 +132,9 @@ function makeRecordingTool(recordedInputs: unknown[]) {
     outputSchema: resolveProductsOutputSchema,
     execute: async (inputData): Promise<ResolveProductsOutput> => {
       recordedInputs.push(inputData);
-      const products = resolveProducts(inputData, fixtureCatalog.map(normalizeProduct));
+      const result = resolveProductsWithTotals(inputData, fixtureCatalog.map(normalizeProduct));
 
-      return { products, resultCount: products.length, criteria: inputData };
+      return { ...result, resultCount: result.products.length, criteria: inputData };
     },
   });
 }
