@@ -259,19 +259,29 @@
     {
       "id": "off-catalog-flight",
       "query": "can you book me a flight to Tokyo next month?",
-      "proves": "An out-of-catalog request is declined with ZERO tool calls, and the reply never claims a retrieval that did not happen.",
+      "proves": "An out-of-catalog request is RETRIEVED FOR and then declined from what came back, never from a prior. This scenario used to assert the opposite \u2014 zero tool calls \u2014 and that assertion is what QA finding 1 fell out of: a model asked to predict emptiness before retrieving cannot tell a kind of commerce the store does not serve (flights) from a product it simply has not checked (ice cube trays), so it denied stocking three products the catalog carries. Retrieval is local and costs nothing but a round-trip, so the search now happens and the empty result does the declining. The reply must still never claim a retrieval that did not happen, and must not offer loosely-matching junk the search turned up as a substitute.",
       "expect": {
-        "toolCalled": false,
-        "toolCallCount": 0,
+        "toolCalled": true,
+        "toolCallCount": 1,
         "forbidden": [
           "i (found|pulled|located|grabbed|retrieved)",
           "here are",
           "here's what i found",
           "these options",
-          "i've (searched|pulled|found)"
+          "i've (searched|pulled|found)",
+          "(instead|alternatively),? (here|these|this)",
+          "as a substitute",
+          "closest (match|product|item) (is|we have)"
+        ],
+        "requiredAnyOf": [
+          "(don|doesn|can|won)['’]t (carry|sell|stock|offer|book)",
+          "(do|does) not (carry|sell|stock|offer|book)",
+          "cannot (carry|sell|stock|offer|book)",
+          "not something (we|this store|i)",
+          "no (flights|travel)"
         ]
       },
-      "offlineGap": "Zero-tool-call behaviour is a property of the planner, not of retrieval. Nothing deterministic can observe it \u2014 resolveProducts is never reached."
+      "offlineGap": "Whether the planner retrieves before declining is a property of the planner, not of retrieval. The offline runner never calls the model, so it cannot see the tool call happen \u2014 or fail to."
     },
     {
       "id": "multi-intent-phone-and-laptop",
@@ -644,7 +654,6 @@
       "id": "false-decline-stocked-microwave",
       "query": "do you carry microwaves?",
       "proves": "A stocked product is searched before it is denied. The catalog carries id 66 Microwave Oven at $89.99 in kitchen-accessories, and the agent answered \"this store doesn't carry microwaves\" with zero tool calls.",
-      "knownFailing": "QA finding 1 \u2014 the agent denies stocking items it stocks, without searching.",
       "regressionOf": "adversarial QA probe false-decline-microwave",
       "expect": {
         "toolCalled": true,
@@ -662,7 +671,6 @@
       "id": "false-decline-stocked-ice-cube-tray",
       "query": "do you sell ice cube trays?",
       "proves": "Same failure on a second stocked item: id 62 Ice Cube Tray, $5.99, kitchen-accessories. The agent replied that it could not search for them because the store does not carry them.",
-      "knownFailing": "QA finding 1 \u2014 the agent denies stocking items it stocks, without searching.",
       "regressionOf": "adversarial QA probe decline-ice-cube-tray",
       "expect": {
         "toolCalled": true,
@@ -680,7 +688,6 @@
       "id": "false-decline-stocked-picture-frame",
       "query": "do you carry picture frames?",
       "proves": "Third instance: id 44 Family Tree Photo Frame, $29.99, home-decoration. The agent answered from a prior about what a store like this stocks rather than from the catalog.",
-      "knownFailing": "QA finding 1 \u2014 the agent denies stocking items it stocks, without searching.",
       "regressionOf": "adversarial QA probe decline-photo-frame",
       "expect": {
         "toolCalled": true,

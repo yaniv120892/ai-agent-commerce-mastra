@@ -4,8 +4,8 @@ Twenty-six scenarios in one golden dataset (`scenarios.json`), graded by two run
 answer two different questions.
 
 > [!IMPORTANT]
-> **Five scenarios are expected to fail.** They encode defects found by adversarial QA and
-> diagnosed but not yet fixed, and they carry a `knownFailing` field that both runners print
+> **Two scenarios are expected to fail.** They encode the recall-window limit — diagnosed,
+> architectural, not yet fixed — and they carry a `knownFailing` field that both runners print
 > at the end of a run. A red eval suite is the current correct state. See
 > [Known-failing scenarios](#known-failing-scenarios) before touching them — the one thing
 > not to do is relax an assertion to get green.
@@ -82,7 +82,7 @@ bounded to 6 agent steps so one runaway tool loop cannot blow the budget between
 | `superlative-highest-rated-catalog`      | **regression** — one wide call, never a fan-out           | yes     | yes    |
 | `unrequested-rating-floor-regression`    | **regression** — no unrequested `minRating`               | yes     | yes    |
 | `ambiguous-cheap-and-cool`               | **regression** — assumptions stated out loud              | partial | yes    |
-| `off-catalog-flight`                     | declines with **zero** tool calls                         | no      | yes    |
+| `off-catalog-flight`                     | searches first, declines from the empty result            | no      | yes    |
 | `multi-intent-phone-and-laptop`          | **regression** — two intents, two real calls              | yes     | yes    |
 | `follow-up-cheaper-than-that`            | prior criteria carried forward, only price tightens       | yes     | yes    |
 | `show-me-more-pagination`                | `excludeProductIds` → zero overlap between pages          | yes     | yes    |
@@ -92,9 +92,9 @@ bounded to 6 agent steps so one runaway tool loop cannot blow the budget between
 | `min-order-trap-cheap-beauty`            | the $9.99 mascara that really costs $479.52               | yes     | yes    |
 | `upstream-zero-reversed-tokens`          | local resolution finds what `/products/search` cannot     | yes     | yes    |
 | `in-stock-only-laptops`                  | availability becomes `inStock`, not a search term         | yes     | yes    |
-| `false-decline-stocked-microwave`        | **known failing** — denies a stocked item, no search      | no      | yes    |
-| `false-decline-stocked-ice-cube-tray`    | **known failing** — same, second item                     | no      | yes    |
-| `false-decline-stocked-picture-frame`    | **known failing** — same, third item                      | no      | yes    |
+| `false-decline-stocked-microwave`        | a stocked item is searched before it is denied            | no      | yes    |
+| `false-decline-stocked-ice-cube-tray`    | same, second item                                         | no      | yes    |
+| `false-decline-stocked-picture-frame`    | same, third item                                          | no      | yes    |
 | `truncation-completeness-follow-up`      | `totalMatched` — a capped list is reported as partial     | yes     | yes    |
 | `truncation-invented-inventory-count`    | `totalInCategory` — stock counted, not cards              | yes     | yes    |
 | `zero-sentinel-empties-catalog`          | category browsing works; zero upper bounds ignored        | yes     | yes    |
@@ -118,21 +118,28 @@ silently, and only the **online** runner can see any of them.
 
 ## Results of the live run
 
-**Current status: 21 of 26 online scenarios pass**, 54 model calls, estimated spend
-**$0.079**. Offline is **40 of 40**. This is a full end-to-end run including the two eviction
-scenarios, which earlier statuses had to exclude. Every failure is in the `knownFailing` set:
-the three `false-decline-*` scenarios and the recall-window pair.
+**Current status: 24 of 26 online scenarios pass**, and the only two failures are the
+recall-window pair, which is where the `knownFailing` set now begins and ends. Offline is
+**40 of 40**. The last full end-to-end run measured 21 of 26 at 54 model calls and $0.079;
+the three `false-decline-*` scenarios have since been fixed and were verified 3/3 over three
+consecutive filtered runs (7 scenarios, 7 model calls, $0.013 each), so the headline is that
+run plus those three, not a fresh full sweep.
+
+**Budget for more calls than 54 from now on.** Declining an out-of-catalog request used to
+cost one model call and no tool call; it now costs a search as well. That is the point of the
+fix, but it lands hardest on the eviction pair, whose eleven filler turns are all
+out-of-catalog by design — roughly 22 extra calls across a full run.
 
 The eviction pair is by far the most expensive in the set — thirteen turns each against one or
 two for everything else, roughly half the run's model calls between them — so the default
 $0.50 cap now binds much sooner than it used to.
 
-Read the count with care: the three `false-decline-*` scenarios are **unfixed**, and how many
-of them fail varies run to run. Finding 1 is intermittent by nature — 3 of 8 stocked items
-probed were falsely declined, driven by item-specific priors rather than sentence shape — so
-across the runs recorded during this work they failed variously zero, two, two and three at a
-time. A green run does not mean the defect is gone; that is exactly why they keep their
-`knownFailing` marker until the prompt rule lands.
+Finding 1 was intermittent while it was live — 3 of 8 stocked items probed were falsely
+declined, driven by item-specific priors rather than sentence shape, and across the runs
+recorded during that work the three scenarios failed variously zero, two, two and three at a
+time. That is why the fix was measured over three runs in each direction rather than one: a
+single green run never proved anything here. See
+[The ablation for "search before you decline"](#the-ablation-for-search-before-you-decline).
 
 > **One flake, not caused by the counts.** `follow-up-cheaper-than-that` passed three of five
 > runs and failed twice with a real model call behind it (`required field maxPrice was not
@@ -146,6 +153,31 @@ set` — the model narrows with `sort: price-asc` plus `excludeProductIds` inste
 > flake described below — but note it landed on the _same_ scenario twice, which the original
 > characterisation ("a different scenario each time") did not predict. If it recurs there
 > specifically, it is worth a look rather than a re-run.
+
+### The ablation for "search before you decline"
+
+Deleting the no-search rule is a prompt change, so it was ablated the same way as everything
+else here — cut it, restore the original paragraph, re-run. Three runs per variant, over the
+three scenarios the rule broke plus the one whose assertions it had shaped:
+
+| Variant                           | `false-decline-*` microwave | ice-cube-tray | picture-frame | `off-catalog-flight` |
+| --------------------------------- | --------------------------- | ------------- | ------------- | -------------------- |
+| **No-search rule deleted (kept)** | 3/3                         | 3/3           | 3/3           | 3/3                  |
+| No-search rule restored           | **0/3**                     | **0/3**       | **0/3**       | **0/3**              |
+
+`ambiguous-cheap-and-cool`, `superlative-highest-rated-catalog` and `simple-category-laptops`
+held 3/3 in both variants, so nothing else moved.
+
+The restored variant failing 0/3 across all three items is stronger than the defect looked
+when it was first characterised as intermittent (zero, two, two and three failures across four
+runs). Intermittency was real, but it was variance on top of a rule that reliably licensed the
+wrong behaviour — not a defect that sometimes was not there.
+
+This is the design principle the codebase already follows, applied in the direction of
+_removal_: **reach for structure when the right answer is impossible or invisible to the
+model, and for prose when it is merely unchosen.** No wording could have fixed this, because
+the prompt was asking for a judgement — "is this search going to be empty?" — that the model
+cannot make from outside the tool. Deleting the judgement was the fix.
 
 ### The ablation for "How many there are"
 
@@ -274,43 +306,55 @@ covered: `upstream-zero-reversed-tokens` asserts the first two directly,
 
 ## Known-failing scenarios
 
-Five scenarios run **red on purpose**: three encode defects found by an adversarial QA pass
-(32 probes against the live catalog) and confirmed against `https://dummyjson.com/products/...`
-directly, and two encode the recall-window limit described in
-[State that outlives the recall window](#state-that-outlives-the-recall-window). They are
-asserted exactly like every other scenario. Each carries a
+Two scenarios run **red on purpose**. Both encode the recall-window limit described in
+[State that outlives the recall window](#state-that-outlives-the-recall-window); every defect
+found by the adversarial QA pass (32 probes against the live catalog) has now been fixed. They
+are asserted exactly like every other scenario. Each carries a
 `knownFailing` string, which both runners print at the end of a run so an intentional red is
 never mistakable for rot.
 
-Four of the original seven have since been fixed: two plus half of a third by the retrieval
-counts (see [What the retrieval counts fixed](#what-the-retrieval-counts-fixed)),
-`zero-sentinel-empties-catalog` by making category browsing legal, and
-`gendered-slug-unrequested-narrowing` by the ambiguous-slug rule. What remains is finding 1
-and the recall-window pair — one defect of the agent's judgement, one of its memory.
+All seven of the original QA scenarios have since been fixed: two plus half of a third by the
+retrieval counts (see [What the retrieval counts fixed](#what-the-retrieval-counts-fixed)),
+`zero-sentinel-empties-catalog` by making category browsing legal,
+`gendered-slug-unrequested-narrowing` by the ambiguous-slug rule, and the three
+`false-decline-*` scenarios by deleting the rule that told the model not to search. What
+remains is the recall-window pair alone — a defect of the agent's memory, not its judgement.
 
 **The rule: clear one by fixing the agent, then delete its `knownFailing` field. Never by
 weakening the assertion.** An eval tuned until it agrees with current behaviour tests
 nothing — the same principle that kept `ambiguous-cheap-and-cool` failing through YAN-38.
 
-| Scenario                                 | Defect                                                                   | Where the fix belongs        |
-| ---------------------------------------- | ------------------------------------------------------------------------ | ---------------------------- |
-| `false-decline-stocked-microwave`        | "this store doesn't carry microwaves" — zero tool calls; id 66 is $89.99 | `instructions.ts`            |
-| `false-decline-stocked-ice-cube-tray`    | same, id 62 at $5.99                                                     | `instructions.ts`            |
-| `false-decline-stocked-picture-frame`    | same, id 44 at $29.99                                                    | `instructions.ts`            |
-| `budget-survives-window-eviction`        | a $50 budget stated 12 turns back no longer reaches the model            | `memory.ts` — working memory |
-| `pagination-ids-survive-window-eviction` | "show me more" re-serves page one; the shown ids were evicted            | `memory.ts` — working memory |
+| Scenario                                 | Defect                                                        | Where the fix belongs        |
+| ---------------------------------------- | ------------------------------------------------------------- | ---------------------------- |
+| `budget-survives-window-eviction`        | a $50 budget stated 12 turns back no longer reaches the model | `memory.ts` — working memory |
+| `pagination-ids-survive-window-eviction` | "show me more" re-serves page one; the shown ids were evicted | `memory.ts` — working memory |
 
 Four notes on reading them:
 
-**Finding 1 is intermittent.** Three of eight stocked items probed with this phrasing were
-falsely declined, and the trigger is item-specific priors rather than sentence shape — "do
-you sell honey?" and "do you sell spice racks?" both searched correctly. The three scenarios
-here may not all fail on a given run. The root cause is a genuine tension in the prompt:
-"Requests this catalog cannot serve" asks the model to predict emptiness _before_ retrieving,
-while an earlier section correctly states that without a tool call it knows nothing about the
-catalog. What is missing is the boundary between a _category_ the store does not serve
-(flights — correctly declined, covered by `off-catalog-flight`) and a _product_ it has simply
-not checked.
+**Finding 1 is fixed, by deleting an instruction rather than adding one.** The root cause was
+a genuine contradiction in the prompt: "Requests this catalog cannot serve" told the model
+_not to call the tool_ for things the catalog does not carry ("do not run a search you already
+know will be empty"), while an earlier section correctly states that without a tool call it
+knows nothing about the catalog. The first rule asks for a prediction the model cannot make —
+it has no way to separate a _kind of commerce_ the store does not serve (flights) from a
+_product_ it simply has not checked (ice cube trays) — so it answered from priors and denied
+stocking three products the catalog carries, with **no tool call behind the denial** for any
+eval, guardrail, or card render to catch.
+
+The no-search rule is gone; an empty result, not a prior, is now the only thing that licenses
+"we don't carry that". The rule was never buying much: `resolveProducts` is pure local
+TypeScript over a cached catalog, so the entire cost of searching "book me a flight" is one
+extra model round-trip. This trades an invisible expensive failure for a visible cheap one.
+
+**This reversed a prior design decision, and one eval had to change with it.**
+`off-catalog-flight` asserted `toolCalled: false, toolCallCount: 0` — that assertion _was_ the
+defect, written into the dataset. It now asserts that the agent searched, declined from what
+came back, and did not offer the loosely-matching junk a search may turn up as a substitute;
+its `forbidden` patterns, which are the part that matters, are unchanged. Note what the live
+runs showed: the flight search is **not** empty — the model reported finding "a non-flight
+product" — so the scenario deliberately does not assert a zero result set. Asserting emptiness
+would have failed on behaviour that is actually correct, because `resolve-products.ts` does
+≥4-character substring matching across descriptions and something always scores.
 
 **Finding 2 was fixed by the retrieval counts, not by the prompt** — see below.
 
@@ -367,10 +411,15 @@ after ten turns and gone after eleven. Both scenarios state their constraint twe
 before the query that must honour it.
 
 The eleven filler turns are deliberately out-of-catalog requests ("do you sell plane
-tickets?"). The prompt already requires the agent to decline those without retrieving, which
-makes the filler cheap — one short call, no tool — and, more importantly, keeps it from
-adding product ids that would confound the exclusion assertion. The only already-shown ids
-in `pagination-ids-survive-window-eviction` are the ones now out of reach.
+tickets?"). **That choice was made under a prompt rule that no longer exists**, and the
+justification has weakened accordingly: the agent used to decline those without retrieving,
+which made the filler cheap and, more importantly, kept it from adding product ids that would
+confound the exclusion assertion. Since the finding-1 fix, each filler turn issues a search,
+so the filler costs roughly twice the model calls and may put ids into the exclusion set that
+`pagination-ids-survive-window-eviction` did not anticipate. Both scenarios are red for an
+unrelated, architectural reason, so this changes nothing about their verdict — but whoever
+fixes the recall window should pick filler that cannot return products rather than filler that
+merely used to not return them.
 
 What the live run showed, with both scenarios run in isolation:
 
