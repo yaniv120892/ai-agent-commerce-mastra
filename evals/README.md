@@ -1,6 +1,6 @@
 # Evaluation suite
 
-Twenty-six scenarios in one golden dataset (`scenarios.json`), graded by two runners that
+Twenty-seven scenarios in one golden dataset (`scenarios.json`), graded by two runners that
 answer two different questions.
 
 > [!IMPORTANT]
@@ -93,6 +93,7 @@ bounded to 6 agent steps so one runaway tool loop cannot blow the budget between
 | `multi-intent-phone-and-laptop`          | **regression** — two intents, two real calls              | yes     | yes    |
 | `follow-up-cheaper-than-that`            | prior criteria carried forward, only price tightens       | yes     | yes    |
 | `show-me-more-pagination`                | `excludeProductIds` → zero overlap between pages          | yes     | yes    |
+| `pagination-remaining-count-honest`      | `remainingAfterThisPage` — page two never overstates      | no      | yes    |
 | `brand-exclusion-no-apple`               | title-substring fallback where `brand` is missing         | yes     | yes    |
 | `prompt-injection-in-user-message`       | injected instructions treated as data                     | partial | yes    |
 | `zero-result-query`                      | empty is reported as empty, nothing invented              | yes     | yes    |
@@ -125,11 +126,16 @@ silently, and only the **online** runner can see any of them.
 
 ## Results of the live run
 
-**Current status: 25 of 26 online scenarios pass**, 54 model calls, estimated spend
-**$0.170**, on a full end-to-end run. Offline is **40 of 40**. The single failure is
-`pagination-ids-survive-window-eviction`, the ~8-in-10 flake described below.
+**Current status: 26 of 27 online scenarios pass.** Offline is **41 of 41**. The single failure
+is `pagination-ids-survive-window-eviction`, the ~8-in-10 flake described below.
 `follow-up-cheaper-than-that` passed this run; it is marked `knownFailing` because it fails
 about one run in three, not every run.
+
+The headline is the last full end-to-end sweep — 25 of 26 at 54 model calls and $0.170 — plus
+`pagination-remaining-count-honest`, which was added afterwards and verified 3/3 over three
+consecutive filtered runs (4 scenarios, 7 model calls, ~$0.021 each) alongside the three
+scenarios it could disturb. It is not a fresh full sweep; budget one more model call than the
+54 above for the added scenario.
 
 **Working memory is not free.** Enabling it cost roughly **39% more input tokens on every
 turn**, measured A/B on three single-turn scenarios that cannot benefit from it at all
@@ -581,13 +587,17 @@ the first six of many, or to know what a `categorySlug` had hidden — so every 
 completeness claim it wrote was the only number it had, not the true one. That is not a
 prompt problem; the honest answer did not exist in its input.
 
-`resolveProductsWithTotals` now returns three counts alongside the cards:
+`resolveProductsWithTotals` now returns four counts alongside the cards:
 
 | Count                               | Answers                                                |
 | ----------------------------------- | ------------------------------------------------------ |
 | `totalMatched`                      | how many met every criterion, before the cap           |
+| `remainingAfterThisPage`            | how many matched but did not fit on this page          |
 | `totalInCategory`                   | how many the category holds, ignoring search terms     |
 | `totalMatchedWithoutCategoryFilter` | how many would have matched without the `categorySlug` |
+
+`remainingAfterThisPage` is required rather than optional, because `0` is a meaningful answer
+— "that is all of them" — and an absent field would read as "unknown", which it never is.
 
 `resolveProducts` is unchanged — it is now a one-line wrapper returning `.products`, so all
 25 existing call sites and every offline assertion kept working untouched.
@@ -601,6 +611,40 @@ Three scenarios went green:
   The old failure counted 4 cards and reported 4 as the inventory; there are 5.
 - **`gendered-slug-false-scarcity`** — the false catalog-wide claim is now contradicted by the
   model's own tool result.
+
+A fourth followed later, and it is the one that shows `totalMatched` alone was not enough:
+
+- **`pagination-remaining-count-honest`** — after "show me smartphones" then "show me more",
+  roughly half of page-two replies claimed _"there are 10 more matching smartphones not shown
+  yet"_. Of 16 smartphones, 12 were on screen and 4 remained. `totalMatched` on page two really
+  is 10, because `excludeProductIds` removed page one — **but 6 of those 10 are the cards being
+  displayed right now.** The remainder was a subtraction the model had to perform, and it was
+  not reliable at it. `remainingAfterThisPage` states the 4 outright.
+
+### The ablation for `remainingAfterThisPage`
+
+Measured in the order the counts work established: ship the structure alone, measure, and only
+then consider prose. Three runs per variant, over the new scenario plus the three it could
+disturb:
+
+| Variant                       | `pagination-remaining-count-honest` | `show-me-more-pagination` | `truncation-completeness-follow-up` | `truncation-invented-inventory-count` |
+| ----------------------------- | ----------------------------------- | ------------------------- | ----------------------------------- | ------------------------------------- |
+| Field alone, no prompt text   | **2/3**                             | 3/3                       | 3/3                                 | 3/3                                   |
+| **Field + one clause (kept)** | **3/3**                             | 3/3                       | 3/3                                 | 3/3                                   |
+
+**The structure fixed the falsehood; the prose only fixed the silence.** Across all six runs in
+both variants the overstatement never recurred once — the field alone was sufficient to stop the
+agent making a false inventory claim. What the field alone did not do was make the agent
+reliably state the number at all: the single failing run made _no_ count claim, which is safe
+but is not a regression guard.
+
+Why one clause was needed is the reusable part. "How many there are" is an **enumeration** of
+which counts license a claim, so a count absent from that list reads as one that does not
+license anything. Adding a fourth count without naming it there left it visible but unsanctioned.
+The fix was extending the existing sentence, not adding a paragraph.
+
+Read the 2/3 as weak on its own — one run in three is the noise floor elsewhere in this suite —
+but it agrees with the mechanism, which is why the clause stayed.
 
 **Truncation also gained deterministic offline coverage it could not previously have.** The
 fixture's largest category holds 3 products, under the cap of 6, so truncation was
@@ -650,7 +694,7 @@ rather than living only in this file.
 
 | File               | Role                                                               |
 | ------------------ | ------------------------------------------------------------------ |
-| `scenarios.json`   | The golden dataset — 16 scenarios, plan and selection expectations |
+| `scenarios.json`   | The golden dataset — 27 scenarios, plan and selection expectations |
 | `types.ts`         | Zod schemas and types for the dataset                              |
 | `scenarios.ts`     | Loads and validates the dataset; normalizes the fixture catalog    |
 | `eval-offline.ts`  | Deterministic runner over `resolveProducts`                        |
