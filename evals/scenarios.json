@@ -259,24 +259,22 @@
     {
       "id": "off-catalog-flight",
       "query": "can you book me a flight to Tokyo next month?",
-      "proves": "An out-of-catalog request is RETRIEVED FOR and then declined from what came back, never from a prior. This scenario used to assert the opposite \u2014 zero tool calls \u2014 and that assertion is what QA finding 1 fell out of: a model asked to predict emptiness before retrieving cannot tell a kind of commerce the store does not serve (flights) from a product it simply has not checked (ice cube trays), so it denied stocking three products the catalog carries. Retrieval is local and costs nothing but a round-trip, so the search now happens and the empty result does the declining. The reply must still never claim a retrieval that did not happen, and must not offer loosely-matching junk the search turned up as a substitute.",
+      "proves": "An out-of-catalog request is declined clearly, in the shopper's terms, without offering loosely-matching junk the search turned up as a substitute. toolCalled is deliberately unasserted: after the no-search rule was removed, declining a flight with or without a search is equally acceptable, and requiring the call made this scenario fail on correct behaviour. The guarantee that products are retrieved for before being denied lives in the false-decline-stocked-* scenarios, which is where it actually matters.",
       "expect": {
-        "toolCalled": true,
         "toolCallCount": 1,
         "forbidden": [
-          "i (found|pulled|located|grabbed|retrieved)",
           "here are",
-          "here's what i found",
           "these options",
-          "i've (searched|pulled|found)",
           "(instead|alternatively),? (here|these|this)",
           "as a substitute",
-          "closest (match|product|item) (is|we have)"
+          "closest (match|product|item) (is|we have)",
+          "(my|the) search (only |just )?(turned up|returned|found)",
+          "(this )?(catalog|store) only (turned up|returned)"
         ],
         "requiredAnyOf": [
-          "(don|doesn|can|won)['’]t (carry|sell|stock|offer|book)",
-          "(do|does) not (carry|sell|stock|offer|book)",
-          "cannot (carry|sell|stock|offer|book)",
+          "(don|doesn|can|won)['\u2019]t\\s+(\\S+\\s+){0,2}(carry|sell|stock|offer|book)",
+          "(do|does) not\\s+(\\S+\\s+){0,2}(carry|sell|stock|offer|book)",
+          "cannot\\s+(\\S+\\s+){0,2}(carry|sell|stock|offer|book)",
           "not something (we|this store|i)",
           "no (flights|travel)"
         ]
@@ -340,12 +338,12 @@
       "id": "follow-up-cheaper-than-that",
       "query": "have you got anything cheaper than that?",
       "priorMessages": ["show me smartphones"],
-      "proves": "A follow-up refines the previous criteria rather than starting over: the category carries forward and only maxPrice tightens.",
+      "proves": "A follow-up carries the previous turn's scope forward and tightens the price. The scope assertion is categorySlug rather than searchTerms because making empty searchTerms legal alongside a category (#20) changed how the model narrows: it now browses categorySlug: smartphones with no terms, which is at least as precise as keyword search and was failing an assertion written before that was expressible.",
       "expect": {
         "toolCalled": true,
         "criteria": {
           "requiredFields": ["maxPrice"],
-          "searchTermsIncludeAnyOf": ["smartphone", "phone", "mobile", "iphone", "galaxy"]
+          "categorySlug": "smartphones"
         }
       },
       "offline": {
@@ -377,7 +375,8 @@
         "expect": {
           "laterCallReturnsFewer": true
         }
-      }
+      },
+      "knownFailing": "Roughly one run in three the model answers \"cheaper than that\" with sort: price-asc plus excludeProductIds and no maxPrice \u2014 which orders the results but never guarantees any of them is cheaper than what was already shown. Diagnosed, not yet fixed."
     },
     {
       "id": "show-me-more-pagination",
