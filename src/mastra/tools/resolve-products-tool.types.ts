@@ -24,6 +24,7 @@ export const resolveProductsOutputSchema = z.object({
   resultCount: z.number(),
   criteria: retrievalCriteriaSchema,
   totalMatched: z.number(),
+  remainingAfterThisPage: z.number(),
   totalMatchedWithoutCategoryFilter: z.number().optional(),
   totalInCategory: z.number().optional(),
 });

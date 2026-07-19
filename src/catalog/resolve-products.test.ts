@@ -325,6 +325,50 @@ describe('resolveProductsWithTotals', () => {
     expect(result.totalMatched).toBe(result.products.length);
   });
 
+  it('reports how many matched but did not fit on this page', () => {
+    const result = resolveProductsWithTotals({ searchTerms: [] }, catalog);
+
+    expect(result.products).toHaveLength(6);
+    expect(result.remainingAfterThisPage).toBe(catalog.length - 6);
+  });
+
+  it('reports zero remaining when every match fit on the page', () => {
+    const result = resolveProductsWithTotals({ searchTerms: [], categorySlug: 'laptops' }, catalog);
+
+    expect(result.products.length).toBeLessThan(6);
+    expect(result.remainingAfterThisPage).toBe(0);
+  });
+
+  it('counts the page itself out of the remainder on a second page', () => {
+    const firstPage = resolveProductsWithTotals({ searchTerms: [] }, catalog);
+    const secondPage = resolveProductsWithTotals(
+      { searchTerms: [], excludeProductIds: firstPage.products.map((product) => product.id) },
+      catalog,
+    );
+
+    expect(secondPage.totalMatched).toBe(catalog.length - 6);
+    expect(secondPage.remainingAfterThisPage).toBe(
+      secondPage.totalMatched - secondPage.products.length,
+    );
+  });
+
+  it('never reports a negative remainder, whatever the criteria', () => {
+    const criteriaVariants: RetrievalCriteria[] = [
+      { searchTerms: [] },
+      { searchTerms: ['laptop'] },
+      { searchTerms: ['nonexistent-term'] },
+      { searchTerms: [], categorySlug: 'laptops' },
+      { searchTerms: ['phone'], maxPrice: 400 },
+    ];
+
+    for (const criteria of criteriaVariants) {
+      const result = resolveProductsWithTotals(criteria, catalog);
+
+      expect(result.remainingAfterThisPage).toBeGreaterThanOrEqual(0);
+      expect(result.remainingAfterThisPage).toBe(result.totalMatched - result.products.length);
+    }
+  });
+
   it('counts what the category filter hid, so a narrow search cannot look catalog-wide', () => {
     const result = resolveProductsWithTotals(
       { searchTerms: ['apple'], categorySlug: 'laptops' },
