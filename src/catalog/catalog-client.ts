@@ -30,6 +30,11 @@ const MAX_LOGGED_PAYLOAD_LENGTH = 500;
 const MAX_REPORTED_REJECTIONS = 5;
 const MINIMUM_VALID_FRACTION = 0.5;
 
+// Without this a stalled upstream never settles, so the retry and last-known-good paths below
+// never run and the shopper's turn hangs instead of degrading. Generous against a ~340ms median
+// so it only fires on a genuine hang, never on a slow day.
+export const CATALOG_REQUEST_TIMEOUT_MS = 10_000;
+
 export type CatalogParseResult = {
   products: RawProduct[];
   totalReceived: number;
@@ -84,8 +89,17 @@ async function requestCatalogWithOneRetry(): Promise<unknown> {
 async function requestCatalogOnce(): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(CATALOG_URL, { headers: { accept: 'application/json' } });
+    response = await fetch(CATALOG_URL, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(CATALOG_REQUEST_TIMEOUT_MS),
+    });
   } catch (error) {
+    if (isTimeout(error)) {
+      throw new CatalogRequestError(
+        `Catalog request to ${CATALOG_URL} timed out after ${CATALOG_REQUEST_TIMEOUT_MS}ms`,
+        { retryable: true, cause: error },
+      );
+    }
     throw new CatalogRequestError(
       `Catalog request to ${CATALOG_URL} failed before a response arrived: ${describeError(error)}`,
       { retryable: true, cause: error },
@@ -184,4 +198,8 @@ function describeError(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function isTimeout(error: unknown): boolean {
+  return error instanceof Error && error.name === 'TimeoutError';
 }
