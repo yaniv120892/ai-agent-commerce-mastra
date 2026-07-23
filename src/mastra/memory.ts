@@ -3,8 +3,12 @@ import { Memory } from '@mastra/memory';
 import path from 'node:path';
 import { z } from 'zod';
 import { ensureUsableDatabaseFile } from './database-file';
+import { findProjectRootDirectory } from './project-root';
 
-export const MEMORY_DATABASE_PATH = path.join(process.cwd(), 'commerce-memory.db');
+// Anchored to the project root rather than process.cwd(): `next dev` runs from the root
+// but `mastra dev` runs from src/mastra/public, and a cwd-relative path split the memory
+// into two databases — Studio could never see the app's threads.
+export const MEMORY_DATABASE_PATH = path.join(findProjectRootDirectory(), 'commerce-memory.db');
 
 // Recall is bounded so a long conversation cannot grow the prompt without limit.
 // Mastra's own default is 10, but leaving it implicit means a library upgrade can
